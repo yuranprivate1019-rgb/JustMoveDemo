@@ -155,3 +155,30 @@ to{opacity:1;transform:none}
 .results{align-items:stretch}
 .plan-tabs{border-radius:20px;flex-wrap:wrap}
 }
+
+/* Targeted polish pass: full-width glass nav, stronger step contrast, and staged plan carousel. */
+.header{width:calc(100vw - 52px);max-width:none;margin:0 auto 18px;padding:10px clamp(18px,4vw,56px);justify-content:space-between;border-radius:0 0 24px 24px;background:linear-gradient(135deg,rgba(255,255,255,.28),rgba(255,255,255,.12));border-color:rgba(255,255,255,.34);border-top:0;box-shadow:0 18px 58px rgba(0,0,0,.18);min-height:68px}
+.header .brand{color:white;text-shadow:0 8px 24px rgba(0,0,0,.34);font-size:22px;letter-spacing:-.035em}
+.header .logo-mark{width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.72);box-shadow:0 12px 32px rgba(0,0,0,.16),inset 0 0 0 1px rgba(255,255,255,.62)}
+.header nav{position:static;display:flex;transform:none;opacity:1;pointer-events:auto;gap:6px}
+.header nav button{padding:8px 13px;background:rgba(255,255,255,.13);color:rgba(255,255,255,.72);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);backdrop-filter:blur(14px)}
+.header nav button:hover{color:white;background:rgba(255,255,255,.24)}
+.progress{background:rgba(8,32,50,.2);border-color:rgba(255,255,255,.25);box-shadow:0 14px 38px rgba(0,0,0,.13)}
+.dot{background:rgba(255,255,255,.42);color:rgba(255,255,255,.88);font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,.22);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.dot span{background:rgba(255,255,255,.62);color:#24516b;font-weight:900;text-shadow:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.4)}
+.dot.on{color:#083344;background:rgba(225,250,255,.9);text-shadow:none}
+.dot.on span{background:#0e7490;color:white;box-shadow:0 8px 20px rgba(14,116,144,.22)}
+.results{position:relative;gap:12px;width:min(1180px,100%);justify-content:center}
+.results .arrow{position:relative;z-index:4;width:56px;height:56px;font-size:32px;margin-top:62px;background:rgba(255,255,255,.72);box-shadow:0 16px 34px rgba(0,0,0,.14),inset 0 0 0 1px rgba(255,255,255,.36)}
+.plan-shell{flex:0 1 940px;gap:14px;overflow:visible}
+.carousel-stage{position:relative;height:620px;display:grid;place-items:center;overflow:hidden;perspective:1200px;padding:0 112px}
+.carousel-stage .plan-card{position:absolute;inset:auto;width:min(720px,calc(100% - 224px));max-width:720px;margin:0;transition:transform .48s cubic-bezier(.22,1,.36,1),opacity .48s ease,filter .48s ease;will-change:transform,opacity,filter;animation:none;pointer-events:none}
+.carousel-stage .plan-card.active{z-index:3;opacity:1;filter:none;transform:translateX(0) translateY(0) scale(1);pointer-events:auto}
+.carousel-stage .plan-card.prev{z-index:1;opacity:.46;filter:blur(3px) saturate(.78);transform:translateX(-54%) translateY(18px) translateZ(-120px) rotateY(9deg) scale(.84)}
+.carousel-stage .plan-card.next{z-index:1;opacity:.46;filter:blur(3px) saturate(.78);transform:translateX(54%) translateY(18px) translateZ(-120px) rotateY(-9deg) scale(.84)}
+.carousel-stage .plan-card.prev:after,.carousel-stage .plan-card.next:after{content:"";position:absolute;inset:0;border-radius:34px;background:rgba(8,32,50,.12);pointer-events:none}
+@media (max-width:800px){
+.header{width:calc(100vw - 28px);min-height:auto;border-radius:22px;padding:12px 16px;flex-direction:row;gap:12px}
+.header .brand{font-size:19px}.header .logo-mark{width:38px;height:38px}.header nav{display:flex}.header nav button{padding:7px 9px;font-size:13px}
+.results{display:grid;grid-template-columns:52px minmax(0,1fr) 52px;gap:6px;align-items:start}.results .arrow{margin-top:94px}.plan-shell{min-width:0}.carousel-stage{height:690px;padding:0 18px}.carousel-stage .plan-card{width:calc(100% - 36px)}.carousel-stage .plan-card.prev{transform:translateX(-34%) translateY(22px) scale(.82)}.carousel-stage .plan-card.next{transform:translateX(34%) translateY(22px) scale(.82)}
+}
