@@ -82,12 +82,37 @@ const plans = [
   { name: 'Most Reliable Plan', icon: '⬡', cost: '$1,764', risk: 'Very Low', confidence: '97%', accent: 'cyan', flight: 'SFO → JFK · 6:00 AM · nonstop', hotel: 'Moxy NYC Times Square · 0.4 mi from meeting', ground: 'Black car pickup + subway backup', explanation: 'Prioritizes on-time arrival with the strongest flight history and the shortest morning transfer.' },
 ];
 
+const flightOptions = [
+  { airline: 'United', route: 'SFO → EWR', departure: '7:25 AM', arrival: '3:58 PM', stops: 'Nonstop', duration: '5h 33m', price: '$428', tag: 'Strong reliability' },
+  { airline: 'Delta', route: 'SFO → JFK', departure: '7:05 AM', arrival: '3:32 PM', stops: 'Nonstop', duration: '5h 27m', price: '$446', tag: 'Balanced option' },
+  { airline: 'JetBlue', route: 'SFO → JFK', departure: '8:10 AM', arrival: '4:44 PM', stops: 'Nonstop', duration: '5h 34m', price: '$372', tag: 'Lower-cost' },
+  { airline: 'American', route: 'SFO → JFK', departure: '6:00 AM', arrival: '2:29 PM', stops: 'Nonstop', duration: '5h 29m', price: '$512', tag: 'Premium friendly' },
+  { airline: 'Alaska', route: 'SFO → JFK', departure: '8:45 AM', arrival: '5:15 PM', stops: 'Nonstop', duration: '5h 30m', price: '$398', tag: 'Flexible value' },
+];
+
+const hotelOptions = [
+  { name: 'Hyatt Place New York / Chelsea', location: 'Chelsea', distance: '0.7 mi to Empire State Building', rate: '$289 / night', tag: 'Free cancellation', rating: 'High confidence' },
+  { name: 'Moxy NYC Chelsea', location: 'Chelsea / NoMad', distance: '0.5 mi to Empire State Building', rate: '$302 / night', tag: 'Flexible rate', rating: 'Guest favorite' },
+  { name: 'Moxy NYC Times Square', location: 'Times Square', distance: '0.6 mi to Empire State Building', rate: '$276 / night', tag: 'Semi-flexible', rating: 'Reliable pick' },
+  { name: 'Hampton Inn Manhattan-35th St / Empire State Bldg', location: 'Midtown South', distance: '0.2 mi to Empire State Building', rate: '$261 / night', tag: 'Refundable', rating: 'Best proximity' },
+  { name: 'Hilton Garden Inn New York / West 35th Street', location: 'Herald Square', distance: '0.2 mi to Empire State Building', rate: '$284 / night', tag: 'Flexible value', rating: 'High confidence' },
+];
+
+const formatFlight = (flight) => `${flight.airline} · ${flight.route} · ${flight.departure} · ${flight.stops}`;
+const formatHotel = (hotel) => `${hotel.name} · ${hotel.distance}`;
+
 function App() {
   const [page, setPage] = useState('book');
   const [mode, setMode] = useState('guided');
   const [planIndex, setPlanIndex] = useState(1);
   const [mouse, setMouse] = useState({ x: 50, y: 35 });
-  const plan = plans[planIndex];
+  const [selectedFlights, setSelectedFlights] = useState({});
+  const [selectedHotels, setSelectedHotels] = useState({});
+  const plan = {
+    ...plans[planIndex],
+    flight: selectedFlights[planIndex] ? formatFlight(selectedFlights[planIndex]) : plans[planIndex].flight,
+    hotel: selectedHotels[planIndex] ? formatHotel(selectedHotels[planIndex]) : plans[planIndex].hotel,
+  };
 
   useEffect(() => {
     const onMove = (e) => setMouse({ x: (e.clientX / window.innerWidth) * 100, y: (e.clientY / window.innerHeight) * 100 });
@@ -110,7 +135,7 @@ function App() {
     <section className="stage">
       {page === 'book' && <BookingPage mode={mode} setMode={setMode} onNext={() => setPage('processing')} />}
       {page === 'processing' && <ProcessingPage />}
-      {page === 'results' && <ResultsPage plan={plan} index={planIndex} setIndex={setPlanIndex} onConfirm={() => setPage('confirm')} />}
+      {page === 'results' && <ResultsPage plan={plan} index={planIndex} setIndex={setPlanIndex} selectedFlights={selectedFlights} setSelectedFlights={setSelectedFlights} selectedHotels={selectedHotels} setSelectedHotels={setSelectedHotels} onConfirm={() => setPage('confirm')} />}
       {page === 'confirm' && <ConfirmPage plan={plan} onConfirm={() => setPage('monitor')} onEdit={() => setPage('results')} />}
       {page === 'monitor' && <MonitorPage onReset={() => setPage('book')} />}
     </section>
@@ -156,17 +181,33 @@ function CalendarPanel({ value, onSelect }) {
 
 function ProcessingPage() { const [active,setActive]=useState(0); useEffect(()=>{const id=setInterval(()=>setActive(v=>Math.min(v+1,4)),760); return()=>clearInterval(id)},[]); return <div className="card process-card appear"><div className="ai-core"><IconGlyph icon="✦"/><span/></div><h1>JustMove AI is planning your trip</h1><p className="processing-copy">The demo AI is comparing flight schedules, hotel proximity, meeting-time risk, total cost, and backup options before recommending three plans.</p><div className="steps">{steps.map((s,i)=><div className={`step ${i<=active?'done':''}`} key={s}><IconGlyph icon="✓"/>{s}</div>)}</div></div>; }
 
-function ResultsPage({ plan, index, setIndex, onConfirm }) {
+function ResultsPage({ index, setIndex, selectedFlights, setSelectedFlights, selectedHotels, setSelectedHotels, onConfirm }) {
+  const [chooser, setChooser] = useState(null);
   const getPosition = (planPosition) => {
     if (planPosition === index) return 'active';
     if (planPosition === (index + 1) % plans.length) return 'next';
     return 'prev';
   };
+  const planFor = (item, planPosition) => ({
+    ...item,
+    flight: selectedFlights[planPosition] ? formatFlight(selectedFlights[planPosition]) : item.flight,
+    hotel: selectedHotels[planPosition] ? formatHotel(selectedHotels[planPosition]) : item.hotel,
+  });
+  const selectChoice = (choice) => {
+    if (chooser === 'flight') setSelectedFlights((current) => ({ ...current, [index]: choice }));
+    if (chooser === 'hotel') setSelectedHotels((current) => ({ ...current, [index]: choice }));
+    setChooser(null);
+  };
 
-  return <div className="results appear"><button className="arrow" aria-label="Previous plan" onClick={()=>setIndex((index+plans.length-1)%plans.length)}><IconGlyph icon="‹"/></button><div className="plan-shell"><div className="plan-tabs">{plans.map((item, planPosition)=><button key={item.name} className={planPosition===index?'active':''} onClick={()=>setIndex(planPosition)}>Plan {planPosition+1}</button>)}</div><div className="carousel-stage">{plans.map((item, planPosition)=><article className={`card plan-card ${item.accent} ${getPosition(planPosition)}`} aria-hidden={planPosition!==index} key={item.name}><div className="plan-head"><IconGlyph icon={item.icon}/><div><p>Plan {planPosition+1} of 3</p><h1>{item.name}</h1></div></div><div className="metrics"><b>{item.cost}<span>Total cost</span></b><b>{item.risk}<span>Risk level</span></b><b>{item.confidence}<span>Confidence</span></b></div><Info icon={'✈'} label="Flight" value={item.flight}/><Info icon={'▣'} label="Hotel" value={item.hotel}/><Info icon={'⌖'} label="Ground transport" value={item.ground}/><p className="explain"><IconGlyph icon="🤖"/>{item.explanation}</p>{planPosition===index && <button className="primary" onClick={onConfirm}>Confirm & Book</button>}</article>)}</div></div><button className="arrow" aria-label="Next plan" onClick={()=>setIndex((index+1)%plans.length)}><IconGlyph icon="›"/></button></div>;
+  return <div className="results appear"><button className="arrow" aria-label="Previous plan" onClick={()=>setIndex((index+plans.length-1)%plans.length)}><IconGlyph icon="‹"/></button><div className="plan-shell"><div className="plan-tabs">{plans.map((item, planPosition)=><button key={item.name} className={planPosition===index?'active':''} onClick={()=>setIndex(planPosition)}>Plan {planPosition+1}</button>)}</div><div className="carousel-stage">{plans.map((item, planPosition)=>{ const displayPlan = planFor(item, planPosition); return <article className={`card plan-card ${item.accent} ${getPosition(planPosition)}`} aria-hidden={planPosition!==index} key={item.name}><div className="plan-head"><IconGlyph icon={item.icon}/><div><p>Plan {planPosition+1} of 3</p><h1>{item.name}</h1></div></div><div className="metrics"><b>{item.cost}<span>Total cost</span></b><b>{item.risk}<span>Risk level</span></b><b>{item.confidence}<span>Confidence</span></b></div><Info icon={'✈'} label="Flight" value={displayPlan.flight} button onClick={()=>setChooser('flight')}/><Info icon={'▣'} label="Hotel" value={displayPlan.hotel} button onClick={()=>setChooser('hotel')}/><Info icon={'⌖'} label="Ground transport" value={item.ground}/><p className="explain"><IconGlyph icon="🤖"/>{item.explanation}</p>{planPosition===index && <button className="primary" onClick={onConfirm}>Confirm & Book</button>}</article>})}</div></div><button className="arrow" aria-label="Next plan" onClick={()=>setIndex((index+1)%plans.length)}><IconGlyph icon="›"/></button>{chooser && <ChoiceModal type={chooser} selected={chooser === 'flight' ? selectedFlights[index] : selectedHotels[index]} onSelect={selectChoice} onClose={()=>setChooser(null)} />}</div>;
 }
-function Info({icon:Icon,label,value}){return <div className="info"><IconGlyph icon={Icon}/><span>{label}</span><strong>{value}</strong></div>}
+function Info({icon:Icon,label,value,button,onClick}){const Tag=button?'button':'div';return <Tag type={button?'button':undefined} className={`info ${button?'clickable':''}`} onClick={onClick}><IconGlyph icon={Icon}/><span>{label}</span><strong>{value}</strong>{button && <em>Change</em>}</Tag>}
 
+function ChoiceModal({ type, selected, onSelect, onClose }) {
+  const isFlight = type === 'flight';
+  const options = isFlight ? flightOptions : hotelOptions;
+  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="choice-modal" role="dialog" aria-modal="true" aria-label={isFlight ? 'Flight options' : 'Hotel options'} onClick={(event)=>event.stopPropagation()}><div className="modal-head"><div><span>{isFlight ? 'SFO → NYC demo flights' : 'NYC demo hotels'}</span><h2>{isFlight ? 'Choose a flight option' : 'Choose a hotel option'}</h2></div><button type="button" aria-label="Close options" onClick={onClose}>×</button></div><div className="choice-list">{options.map((option)=>{ const active = selected && (isFlight ? selected.airline === option.airline : selected.name === option.name); return <button type="button" className={`choice-card ${active ? 'selected' : ''}`} key={isFlight ? option.airline : option.name} onClick={()=>onSelect(option)}><div className="choice-title"><strong>{isFlight ? option.airline : option.name}</strong><span>{isFlight ? option.price : option.rate}</span></div><p>{isFlight ? option.route : option.location}</p><div className="choice-meta">{isFlight ? <><span>{option.departure} → {option.arrival}</span><span>{option.stops}</span><span>{option.duration}</span><em>{option.tag}</em></> : <><span>{option.distance}</span><span>{option.tag}</span><em>{option.rating}</em></>}</div></button>})}</div></section></div>;
+}
 function ConfirmPage({ plan, onConfirm, onEdit }) { return <div className="card confirm-card appear"><h1>Confirm & Book</h1><p className="notice"><IconGlyph icon="⬡"/>JustMove.AI never books without your approval. Review this mock trip summary, then explicitly confirm.</p><div className="summary"><div className="summary-hero"><IconGlyph icon={plan.icon}/><div><span>Selected plan</span><strong>{plan.name}</strong><p>{plan.explanation}</p></div></div><div className="summary-grid"><Info icon={'◫'} label="Mock total" value={plan.cost}/><Info icon={'▣'} label="Stay" value={plan.hotel}/><Info icon={'◴'} label="Meeting" value="Empire State Building · 10:00 AM"/></div></div><div className="actions"><button className="primary" onClick={onConfirm}>Confirm Booking</button><button onClick={onEdit}>Edit Plan</button><button>Ask AI Why</button></div></div>; }
 function MonitorPage({ onReset }) { return <div className="card monitor-card appear"><div className="alert"><IconGlyph icon="🔔"/>Flight delay detected</div><h1>AI Travel Monitoring</h1><p>Your SFO → NYC flight is now estimated 48 minutes late. JustMove found a backup nonstop that protects your arrival buffer and keeps the trip under budget.</p><div className="backup"><Info icon={'✈'} label="Backup option" value="Earlier SFO → JFK nonstop · arrives 8:42 PM"/><Info icon={'◈'} label="Budget impact" value="+$96 · still under $1,800"/><Info icon={'⬡'} label="Reliability" value="Reduces meeting delay risk to Very Low"/></div><div className="actions"><button onClick={onReset}>Keep Current Plan</button><button className="primary" onClick={onReset}>Approve Backup</button></div></div>; }
 
