@@ -52,6 +52,28 @@ const guidedFields = [
   ['Hotel Nightly Cap', '▣'],
 ];
 
+
+const travelSlides = [
+  { label: 'Airport departure', image: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1800&q=80' },
+  { label: 'San Francisco aerial', image: 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fit=crop&w=1800&q=80' },
+  { label: 'New York aerial', image: 'https://images.unsplash.com/photo-1522083165195-3424ed129620?auto=format&fit=crop&w=1800&q=80' },
+  { label: 'Hotel lobby', image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1800&q=80' },
+  { label: 'Hotel room', image: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=1800&q=80' },
+];
+
+const calendarDays = Array.from({ length: 31 }, (_, index) => index + 1);
+const departDay = 14;
+const returnDay = 16;
+
+const advancedPreferenceOptions = [
+  'Nonstop',
+  'Morning departure',
+  'Flexible hotel',
+  'Refundable option',
+  'Near meeting location',
+  'Lower price priority',
+];
+
 const steps = ['Reading trip details', 'Comparing flights, hotels, and timing risk', 'Checking costs against your caps', 'Finding delay backups and commute buffers', 'Building 3 smart plans'];
 
 const plans = [
@@ -82,6 +104,7 @@ function App() {
   const currentStep = page === 'book' ? 0 : page === 'processing' ? 1 : page === 'results' ? 2 : page === 'confirm' ? 3 : 4;
 
   return <main className="app" style={{ '--mx': `${mouse.x}%`, '--my': `${mouse.y}%` }}>
+    <TravelBackground />
     <Header />
     <Progress current={currentStep} />
     <section className="stage">
@@ -95,13 +118,15 @@ function App() {
 }
 
 function IconGlyph({ icon }) { return <span className="glyph">{icon}</span>; }
-function Header() { return <header className="header"><div className="brand"><span className="logo-mark"><img src={`${import.meta.env.BASE_URL}justmove-logo.png`} alt="JustMove.AI logo" /></span>JustMove.AI</div><nav><button>Book</button><button>Trips</button><button>Alerts</button><span className="profile"><IconGlyph icon="◉"/></span></nav></header>; }
+function TravelBackground() { return <div className="travel-bg" aria-hidden="true">{travelSlides.map((slide, index) => <span key={slide.label} style={{ backgroundImage: `url(${slide.image})`, animationDelay: `${index * 6}s` }} />)}</div>; }
+function Header() { return <header className="header"><div className="brand"><span className="logo-mark"><img src={`${import.meta.env.BASE_URL}justmove-logo.png`} alt="JustMove.AI logo" /></span><span>JustMove.AI</span></div><nav aria-label="Secondary prototype navigation"><button>Book</button><button>Trips</button><button>Alerts</button></nav></header>; }
 function Progress({ current }) { return <div className="progress">{['Input','AI Scan','Plans','Confirm','Monitor'].map((s,i)=><div className={`dot ${i<=current?'on':''}`} key={s}><span>{i+1}</span>{s}</div>)}</div>; }
 
 function BookingPage({ mode, setMode, onNext }) {
   const [booking, setBooking] = useState(defaultBookingValues);
   const [openField, setOpenField] = useState(null);
   const [citySearch, setCitySearch] = useState('');
+  const [preferences, setPreferences] = useState(['Nonstop', 'Near meeting location']);
 
   const filteredCities = useMemo(() => cityOptions.filter((option) => option.toLowerCase().includes(citySearch.toLowerCase())), [citySearch]);
   const selectOption = (label, value) => {
@@ -109,12 +134,14 @@ function BookingPage({ mode, setMode, onNext }) {
     setOpenField(null);
     setCitySearch('');
   };
+  const togglePreference = (preference) => setPreferences((current) => current.includes(preference) ? current.filter((item) => item !== preference) : [...current, preference]);
 
-  return <div className="card booking-card appear"><div className="switch"><button className={mode==='guided'?'active':''} onClick={()=>setMode('guided')}>Guided Booking</button><button className={mode==='describe'?'active':''} onClick={()=>setMode('describe')}>Describe Your Trip</button></div>{mode==='guided'?<><div className="grid">{guidedFields.map(([label,Icon])=><div className="field-wrap" key={label}><button className={`field ${openField===label?'open':''}`} type="button" onClick={()=>setOpenField(openField===label?null:label)}><span><IconGlyph icon={Icon}/>{label}</span><strong>{booking[label]}</strong><em>Tap to change</em></button>{openField===label && <OptionPanel label={label} value={booking[label]} citySearch={citySearch} setCitySearch={setCitySearch} cityOptions={filteredCities} onSelect={(value)=>selectOption(label,value)} />}</div>)}</div><details className="advanced"><summary>Advanced Preferences</summary><div>Avoid red-eye flights · prefer flexible fares · hotel rating 4★+ · low-layover risk</div></details></>:<div className="describe"><label>Tell JustMove what you need</label><textarea defaultValue="I need to travel from San Francisco to New York for a client meeting near the Empire State Building. Keep the total trip under $1,800, avoid risky layovers, and choose a hotel close to the meeting." /></div>}<button className="primary" onClick={onNext}><IconGlyph icon="⚡"/>Generate 3 Smart Plans</button></div>;
+  return <div className="card booking-card appear"><div className="switch"><button className={mode==='guided'?'active':''} onClick={()=>setMode('guided')}>Guided Booking</button><button className={mode==='describe'?'active':''} onClick={()=>setMode('describe')}>Describe Your Trip</button></div>{mode==='guided'?<><div className="grid">{guidedFields.map(([label,Icon])=><div className="field-wrap" key={label}><button className={`field ${openField===label?'open':''}`} type="button" onClick={()=>setOpenField(openField===label?null:label)}><span><IconGlyph icon={Icon}/>{label}</span><strong>{booking[label]}</strong><em>{label === 'Dates' ? 'Open calendar' : 'Tap to change'}</em></button>{openField===label && <OptionPanel label={label} value={booking[label]} citySearch={citySearch} setCitySearch={setCitySearch} cityOptions={filteredCities} onSelect={(value)=>selectOption(label,value)} />}</div>)}</div><section className="advanced"><div className="advanced-head"><h2>Advanced Preferences</h2><p>Select what matters most for this trip.</p></div><div className="preference-grid">{advancedPreferenceOptions.map((preference)=><button className={`preference ${preferences.includes(preference)?'selected':''}`} type="button" key={preference} onClick={()=>togglePreference(preference)}><span className="check">✓</span>{preference}</button>)}</div></section></>:<div className="describe"><label>Tell JustMove what you need</label><textarea defaultValue="I need to travel from San Francisco to New York for a client meeting near the Empire State Building. Keep the total trip under $1,800, avoid risky layovers, and choose a hotel close to the meeting." /></div>}<button className="primary" onClick={onNext}><IconGlyph icon="⚡"/>Generate Plans</button></div>;
 }
 
 function OptionPanel({ label, value, citySearch, setCitySearch, cityOptions, onSelect }) {
   const isCity = label === 'From' || label === 'To';
+  if (label === 'Dates') return <CalendarPanel value={value} onSelect={onSelect} />;
   const options = isCity ? cityOptions : bookingOptions[label];
   return <div className={`option-panel ${isCity ? 'search-panel' : ''}`}>
     {isCity && <input className="search-box" value={citySearch} onChange={(event)=>setCitySearch(event.target.value)} placeholder={`Search ${label.toLowerCase()} city or airport`} autoFocus />}
@@ -122,9 +149,14 @@ function OptionPanel({ label, value, citySearch, setCitySearch, cityOptions, onS
   </div>;
 }
 
+function CalendarPanel({ value, onSelect }) {
+  return <div className="option-panel calendar-panel"><div className="date-summary"><div><span>Depart</span><strong>Tue, Jul 14</strong></div><div><span>Return</span><strong>Thu, Jul 16</strong></div></div><div className="calendar-title"><button type="button" aria-label="Previous month">‹</button><strong>July 2026</strong><button type="button" aria-label="Next month">›</button></div><div className="weekdays">{['Su','Mo','Tu','We','Th','Fr','Sa'].map((day)=><span key={day}>{day}</span>)}</div><div className="calendar-grid">{calendarDays.map((day)=><button type="button" key={day} className={`${day===departDay?'depart':''} ${day===returnDay?'return':''} ${day>departDay && day<returnDay?'in-range':''}`}><span>{day}</span>{day===departDay && <em>Depart</em>}{day===returnDay && <em>Return</em>}</button>)}</div><button className="apply-date" type="button" onClick={()=>onSelect(value)}>Apply dates</button></div>;
+}
+
+
 function ProcessingPage() { const [active,setActive]=useState(0); useEffect(()=>{const id=setInterval(()=>setActive(v=>Math.min(v+1,4)),760); return()=>clearInterval(id)},[]); return <div className="card process-card appear"><div className="ai-core"><IconGlyph icon="✦"/><span/></div><h1>JustMove AI is planning your trip</h1><p className="processing-copy">The demo AI is comparing flight schedules, hotel proximity, meeting-time risk, total cost, and backup options before recommending three plans.</p><div className="steps">{steps.map((s,i)=><div className={`step ${i<=active?'done':''}`} key={s}><IconGlyph icon="✓"/>{s}</div>)}</div></div>; }
 
-function ResultsPage({ plan, index, setIndex, onConfirm }) { const Icon=plan.icon; return <div className="results appear"><button className="arrow" aria-label="Previous plan" onClick={()=>setIndex((index+2)%3)}><IconGlyph icon="‹"/></button><div className={`card plan-card ${plan.accent}`}><div className="plan-head"><IconGlyph icon={Icon}/><div><p>Plan {index+1} of 3</p><h1>{plan.name}</h1></div></div><div className="metrics"><b>{plan.cost}<span>Total cost</span></b><b>{plan.risk}<span>Risk level</span></b><b>{plan.confidence}<span>Confidence</span></b></div><Info icon={'✈'} label="Flight" value={plan.flight}/><Info icon={'▣'} label="Hotel" value={plan.hotel}/><Info icon={'⌖'} label="Ground transport" value={plan.ground}/><p className="explain"><IconGlyph icon="🤖"/>{plan.explanation}</p><button className="primary" onClick={onConfirm}>Confirm & Book</button></div><button className="arrow" aria-label="Next plan" onClick={()=>setIndex((index+1)%3)}><IconGlyph icon="›"/></button></div>; }
+function ResultsPage({ plan, index, setIndex, onConfirm }) { const Icon=plan.icon; return <div className="results appear"><button className="arrow" aria-label="Previous plan" onClick={()=>setIndex((index+2)%3)}><IconGlyph icon="‹"/></button><div className="plan-shell"><div className="plan-tabs">{plans.map((item, planPosition)=><button key={item.name} className={planPosition===index?'active':''} onClick={()=>setIndex(planPosition)}>Plan {planPosition+1}</button>)}</div><div className={`card plan-card ${plan.accent}`} key={plan.name}><div className="plan-head"><IconGlyph icon={Icon}/><div><p>Plan {index+1} of 3</p><h1>{plan.name}</h1></div></div><div className="metrics"><b>{plan.cost}<span>Total cost</span></b><b>{plan.risk}<span>Risk level</span></b><b>{plan.confidence}<span>Confidence</span></b></div><Info icon={'✈'} label="Flight" value={plan.flight}/><Info icon={'▣'} label="Hotel" value={plan.hotel}/><Info icon={'⌖'} label="Ground transport" value={plan.ground}/><p className="explain"><IconGlyph icon="🤖"/>{plan.explanation}</p><button className="primary" onClick={onConfirm}>Confirm & Book</button></div></div><button className="arrow" aria-label="Next plan" onClick={()=>setIndex((index+1)%3)}><IconGlyph icon="›"/></button></div>; }
 function Info({icon:Icon,label,value}){return <div className="info"><IconGlyph icon={Icon}/><span>{label}</span><strong>{value}</strong></div>}
 
 function ConfirmPage({ plan, onConfirm, onEdit }) { return <div className="card confirm-card appear"><h1>Confirm & Book</h1><p className="notice"><IconGlyph icon="⬡"/>JustMove.AI never books without your approval. Review this mock trip summary, then explicitly confirm.</p><div className="summary"><div className="summary-hero"><IconGlyph icon={plan.icon}/><div><span>Selected plan</span><strong>{plan.name}</strong><p>{plan.explanation}</p></div></div><div className="summary-grid"><Info icon={'◫'} label="Mock total" value={plan.cost}/><Info icon={'▣'} label="Stay" value={plan.hotel}/><Info icon={'◴'} label="Meeting" value="Empire State Building · 10:00 AM"/></div></div><div className="actions"><button className="primary" onClick={onConfirm}>Confirm Booking</button><button onClick={onEdit}>Edit Plan</button><button>Ask AI Why</button></div></div>; }
