@@ -204,3 +204,21 @@ to{opacity:1;transform:none}
 .choice-list{display:grid;gap:12px}.choice-card{border:1px solid rgba(14,165,233,.18);border-radius:22px;background:rgba(255,255,255,.72);padding:16px;text-align:left;cursor:pointer;transition:.22s ease;color:#17324d}.choice-card:hover,.choice-card.selected{transform:translateY(-2px);border-color:rgba(14,165,233,.5);background:linear-gradient(135deg,#e3fbff,#f2ecff);box-shadow:0 16px 34px rgba(14,165,233,.16)}.choice-card.selected{outline:3px solid rgba(14,165,233,.18)}
 .choice-title{display:flex;justify-content:space-between;gap:12px;align-items:center}.choice-title strong{font-size:18px;color:#102033}.choice-title span{border-radius:999px;background:#102033;color:white;padding:7px 10px;font-weight:900}.choice-card p{margin:7px 0 10px;color:#456076;font-weight:800}.choice-meta{display:flex;gap:8px;flex-wrap:wrap}.choice-meta span,.choice-meta em{border-radius:999px;background:rgba(224,242,254,.86);color:#24516b;padding:7px 10px;font-size:12px;font-style:normal;font-weight:900}.choice-meta em{background:rgba(220,252,231,.9);color:#047857}
 @media (max-width:800px){.app{padding-top:98px}.stage{padding-inline:12px}.header{padding:10px 12px}.carousel-stage{height:720px;mask-image:none}.carousel-stage .plan-card{width:min(620px,88vw)}.carousel-stage .plan-card.prev{transform:translateX(-66vw) translateY(28px) scale(.82)}.carousel-stage .plan-card.next{transform:translateX(66vw) translateY(28px) scale(.82)}.results .arrow{margin:106px -8px 0}.info.clickable{grid-template-columns:24px 1fr auto}.info.clickable strong{grid-column:2 / 4}.modal-backdrop{padding:12px}.choice-modal{border-radius:24px;padding:16px}}
+
+
+/* Bug-fix polish: keep carousel controls inside the viewport and tidy selectable rows. */
+.results{width:min(1120px,100%);max-width:100%;padding:0 72px;gap:0;overflow:visible;position:relative}
+.plan-shell{width:100%;min-width:0;overflow:visible}
+.carousel-stage{width:100%;height:620px;padding:0 96px;overflow:hidden;mask-image:linear-gradient(90deg,transparent 0,#000 9%,#000 91%,transparent 100%)}
+.carousel-stage .plan-card{width:min(720px,calc(100% - 192px));max-width:720px}
+.carousel-stage .plan-card.prev{transform:translateX(-42%) translateY(18px) translateZ(-140px) rotateY(10deg) scale(.84);opacity:.42;filter:blur(3.2px) saturate(.78)}
+.carousel-stage .plan-card.next{transform:translateX(42%) translateY(18px) translateZ(-140px) rotateY(-10deg) scale(.84);opacity:.42;filter:blur(3.2px) saturate(.78)}
+.results .arrow{position:absolute;top:50%;z-index:8;margin:22px 0 0;width:56px;height:56px;transform:translateY(-50%);display:grid;place-items:center}
+.results .arrow:first-child{left:18px}
+.results .arrow:last-of-type{right:18px}
+.results .arrow:hover{transform:translateY(calc(-50% - 2px))}
+.info{min-width:0}
+.info.clickable{grid-template-columns:24px minmax(70px,96px) minmax(0,1fr) auto;column-gap:10px;padding:14px 12px;border-radius:16px;overflow:hidden}
+.info.clickable strong{min-width:0;overflow-wrap:anywhere;line-height:1.35}
+.info.clickable em{align-self:center;white-space:nowrap;border-radius:999px;background:rgba(224,242,254,.9);padding:8px 10px}
+@media (max-width:800px){.results{grid-template-columns:44px minmax(0,1fr) 44px;width:100%;padding:0 4px}.carousel-stage{width:100%;height:720px;padding:0 10px;mask-image:none}.carousel-stage .plan-card{width:calc(100% - 20px)}.carousel-stage .plan-card.prev{transform:translateX(-48vw) translateY(28px) scale(.82)}.carousel-stage .plan-card.next{transform:translateX(48vw) translateY(28px) scale(.82)}.results .arrow{position:relative;top:auto;left:auto!important;right:auto!important;margin:112px 0 0;transform:none;width:44px;height:44px}.results .arrow:hover{transform:translateY(-2px)}.info.clickable{grid-template-columns:24px minmax(0,1fr) auto}.info.clickable span{grid-column:2}.info.clickable strong{grid-column:2 / 4}.info.clickable em{grid-column:3;grid-row:1 / 3}}
