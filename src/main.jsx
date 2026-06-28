@@ -101,6 +101,67 @@ const hotelOptions = [
 const formatFlight = (flight) => `${flight.airline} · ${flight.route} · ${flight.departure} · ${flight.stops}`;
 const formatHotel = (hotel) => `${hotel.name} · ${hotel.distance}`;
 
+const GROUND_TRANSPORT_ESTIMATE = 210;
+const planDemoPrices = [
+  { flight: 372, hotel: 260 },
+  { flight: 428, hotel: 289 },
+  { flight: 512, hotel: 302 },
+];
+
+const currencyValue = (value) => Number(value.match(/\$([\d,]+)/)?.[1].replace(',', '') ?? 0);
+const formatCurrency = (value) => `$${Math.round(value).toLocaleString()}`;
+
+const riskScores = {
+  'Very Low': 1,
+  Low: 2,
+  Medium: 3,
+  High: 4,
+};
+const riskLabels = ['Very Low', 'Low', 'Medium', 'High'];
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const riskLabelFromScore = (score) => riskLabels[clamp(Math.round(score), 1, 4) - 1];
+
+const flightRiskAdjustment = (flight) => {
+  if (!flight) return 0;
+  const text = `${flight.stops} ${flight.tag}`.toLowerCase();
+  if (text.includes('strong reliability') || text.includes('premium') || text.includes('flexible')) return -0.45;
+  if (text.includes('lower-cost')) return 0.45;
+  return 0;
+};
+
+const hotelRiskAdjustment = (hotel) => {
+  if (!hotel) return 0;
+  const text = `${hotel.tag} ${hotel.rating}`.toLowerCase();
+  if (text.includes('refundable') || text.includes('free cancellation') || text.includes('high confidence') || text.includes('best proximity')) return -0.4;
+  if (text.includes('semi-flexible')) return 0.2;
+  return -0.1;
+};
+
+const demoPlanFor = (item, planPosition, selectedFlights, selectedHotels) => {
+  const selectedFlight = selectedFlights[planPosition];
+  const selectedHotel = selectedHotels[planPosition];
+  const changed = Boolean(selectedFlight || selectedHotel);
+  if (!changed) return item;
+
+  const base = planDemoPrices[planPosition];
+  const flightPrice = selectedFlight ? currencyValue(selectedFlight.price) : base.flight;
+  const hotelRate = selectedHotel ? currencyValue(selectedHotel.rate) : base.hotel;
+  const total = flightPrice + hotelRate + GROUND_TRANSPORT_ESTIMATE;
+  const baseRisk = riskScores[item.risk] ?? 3;
+  const riskScore = clamp(baseRisk + flightRiskAdjustment(selectedFlight) + hotelRiskAdjustment(selectedHotel) + (total < 900 ? 0.25 : 0) - (total > 980 ? 0.15 : 0), 1, 4);
+  const confidence = clamp(Number(item.confidence.replace('%', '')) - ((riskScore - baseRisk) * 5) + (selectedFlight?.tag.toLowerCase().includes('lower-cost') ? -1 : 0) + (selectedHotel?.tag.toLowerCase().includes('refundable') ? 2 : 0), 82, 99);
+
+  return {
+    ...item,
+    cost: formatCurrency(total),
+    risk: riskLabelFromScore(riskScore),
+    confidence: `${Math.round(confidence)}%`,
+    flight: selectedFlight ? formatFlight(selectedFlight) : item.flight,
+    hotel: selectedHotel ? formatHotel(selectedHotel) : item.hotel,
+  };
+};
+
+
 function App() {
   const [page, setPage] = useState('book');
   const [mode, setMode] = useState('guided');
@@ -108,11 +169,7 @@ function App() {
   const [mouse, setMouse] = useState({ x: 50, y: 35 });
   const [selectedFlights, setSelectedFlights] = useState({});
   const [selectedHotels, setSelectedHotels] = useState({});
-  const plan = {
-    ...plans[planIndex],
-    flight: selectedFlights[planIndex] ? formatFlight(selectedFlights[planIndex]) : plans[planIndex].flight,
-    hotel: selectedHotels[planIndex] ? formatHotel(selectedHotels[planIndex]) : plans[planIndex].hotel,
-  };
+  const plan = demoPlanFor(plans[planIndex], planIndex, selectedFlights, selectedHotels);
 
   useEffect(() => {
     const onMove = (e) => setMouse({ x: (e.clientX / window.innerWidth) * 100, y: (e.clientY / window.innerHeight) * 100 });
@@ -188,18 +245,14 @@ function ResultsPage({ index, setIndex, selectedFlights, setSelectedFlights, sel
     if (planPosition === (index + 1) % plans.length) return 'next';
     return 'prev';
   };
-  const planFor = (item, planPosition) => ({
-    ...item,
-    flight: selectedFlights[planPosition] ? formatFlight(selectedFlights[planPosition]) : item.flight,
-    hotel: selectedHotels[planPosition] ? formatHotel(selectedHotels[planPosition]) : item.hotel,
-  });
+  const planFor = (item, planPosition) => demoPlanFor(item, planPosition, selectedFlights, selectedHotels);
   const selectChoice = (choice) => {
     if (chooser === 'flight') setSelectedFlights((current) => ({ ...current, [index]: choice }));
     if (chooser === 'hotel') setSelectedHotels((current) => ({ ...current, [index]: choice }));
     setChooser(null);
   };
 
-  return <div className="results appear"><button className="arrow" aria-label="Previous plan" onClick={()=>setIndex((index+plans.length-1)%plans.length)}><IconGlyph icon="‹"/></button><div className="plan-shell"><div className="plan-tabs">{plans.map((item, planPosition)=><button key={item.name} className={planPosition===index?'active':''} onClick={()=>setIndex(planPosition)}>Plan {planPosition+1}</button>)}</div><div className="carousel-stage">{plans.map((item, planPosition)=>{ const displayPlan = planFor(item, planPosition); return <article className={`card plan-card ${item.accent} ${getPosition(planPosition)}`} aria-hidden={planPosition!==index} key={item.name}><div className="plan-head"><IconGlyph icon={item.icon}/><div><p>Plan {planPosition+1} of 3</p><h1>{item.name}</h1></div></div><div className="metrics"><b>{item.cost}<span>Total cost</span></b><b>{item.risk}<span>Risk level</span></b><b>{item.confidence}<span>Confidence</span></b></div><Info icon={'✈'} label="Flight" value={displayPlan.flight} button onClick={()=>setChooser('flight')}/><Info icon={'▣'} label="Hotel" value={displayPlan.hotel} button onClick={()=>setChooser('hotel')}/><Info icon={'⌖'} label="Ground transport" value={item.ground}/><p className="explain"><IconGlyph icon="🤖"/>{item.explanation}</p>{planPosition===index && <button className="primary" onClick={onConfirm}>Confirm & Book</button>}</article>})}</div></div><button className="arrow" aria-label="Next plan" onClick={()=>setIndex((index+1)%plans.length)}><IconGlyph icon="›"/></button>{chooser && <ChoiceModal type={chooser} selected={chooser === 'flight' ? selectedFlights[index] : selectedHotels[index]} onSelect={selectChoice} onClose={()=>setChooser(null)} />}</div>;
+  return <div className="results appear"><button className="arrow" aria-label="Previous plan" onClick={()=>setIndex((index+plans.length-1)%plans.length)}><IconGlyph icon="‹"/></button><div className="plan-shell"><div className="plan-tabs">{plans.map((item, planPosition)=><button key={item.name} className={planPosition===index?'active':''} onClick={()=>setIndex(planPosition)}>Plan {planPosition+1}</button>)}</div><div className="carousel-stage">{plans.map((item, planPosition)=>{ const displayPlan = planFor(item, planPosition); return <article className={`card plan-card ${item.accent} ${getPosition(planPosition)}`} aria-hidden={planPosition!==index} key={item.name}><div className="plan-head"><IconGlyph icon={item.icon}/><div><p>Plan {planPosition+1} of 3</p><h1>{item.name}</h1></div></div><div className="metrics"><b>{displayPlan.cost}<span>Total cost</span></b><b>{displayPlan.risk}<span>Risk level</span></b><b>{displayPlan.confidence}<span>Confidence</span></b></div><Info icon={'✈'} label="Flight" value={displayPlan.flight} button onClick={()=>setChooser('flight')}/><Info icon={'▣'} label="Hotel" value={displayPlan.hotel} button onClick={()=>setChooser('hotel')}/><Info icon={'⌖'} label="Ground transport" value={item.ground}/><p className="explain"><IconGlyph icon="🤖"/>{item.explanation}</p>{planPosition===index && <button className="primary" onClick={onConfirm}>Confirm & Book</button>}</article>})}</div></div><button className="arrow" aria-label="Next plan" onClick={()=>setIndex((index+1)%plans.length)}><IconGlyph icon="›"/></button>{chooser && <ChoiceModal type={chooser} selected={chooser === 'flight' ? selectedFlights[index] : selectedHotels[index]} onSelect={selectChoice} onClose={()=>setChooser(null)} />}</div>;
 }
 function Info({icon:Icon,label,value,button,onClick}){const Tag=button?'button':'div';return <Tag type={button?'button':undefined} className={`info ${button?'clickable':''}`} onClick={onClick}><IconGlyph icon={Icon}/><span>{label}</span><strong>{value}</strong>{button && <em>Change</em>}</Tag>}
 
