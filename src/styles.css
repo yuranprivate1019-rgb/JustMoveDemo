@@ -98,3 +98,60 @@ to{opacity:1;transform:none}
 .field{min-height:auto}
 .summary-hero{grid-template-columns:1fr}
 }
+
+.travel-bg{position:fixed;inset:0;z-index:0;overflow:hidden;background:#082032;pointer-events:none}
+.travel-bg span{position:absolute;inset:-2%;background-size:cover;background-position:center;opacity:0;filter:saturate(1.05) contrast(1.03);animation:travelFade 30s infinite}
+.travel-bg:after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(4,14,27,.66),rgba(10,36,58,.44) 45%,rgba(40,19,75,.54)),radial-gradient(circle at var(--mx) var(--my),rgba(52,211,235,.22),transparent 22rem);backdrop-filter:blur(1px)}
+@keyframes travelFade{0%,100%{opacity:0;transform:scale(1.04)}5%,20%{opacity:1;transform:scale(1)}25%{opacity:0;transform:scale(1.02)}}
+
+.header{justify-content:center;max-width:390px;margin-bottom:18px;padding:11px 18px;background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.34);box-shadow:0 24px 80px rgba(0,0,0,.18)}
+.header .brand{color:white;text-shadow:0 10px 28px rgba(0,0,0,.26);font-size:25px}
+.header nav{position:absolute;right:16px;opacity:.07;transform:translateX(112%);pointer-events:none}
+.header nav button{padding:8px 11px;background:rgba(255,255,255,.45)}
+.progress{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:6px;width:max-content;max-width:100%;backdrop-filter:blur(18px)}
+.dot{background:rgba(255,255,255,.36);color:rgba(255,255,255,.72)}
+.dot.on{background:rgba(225,250,255,.82)}
+
+.calendar-panel{width:min(430px,88vw);right:auto;padding:16px}
+.date-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px}
+.date-summary div{border-radius:16px;padding:12px;background:linear-gradient(135deg,#eefbff,#f5f0ff);border:1px solid rgba(14,165,233,.16)}
+.date-summary span{display:block;color:#6b8197;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.09em}
+.date-summary strong{display:block;margin-top:3px;color:#102033}
+.calendar-title{display:flex;align-items:center;justify-content:space-between;padding:4px 2px 12px;color:#102033}
+.calendar-title button{border:0;width:34px;height:34px;border-radius:50%;background:#e7faff;color:#0e7490;font-size:22px;font-weight:900;cursor:pointer}
+.weekdays,.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.weekdays span{text-align:center;font-size:11px;font-weight:900;color:#6b8197;text-transform:uppercase}
+.calendar-grid{margin-top:7px}
+.calendar-grid button{min-height:52px;border:0;border-radius:14px;background:#f6fbff;color:#24465f;cursor:pointer;font-weight:900;position:relative;transition:.2s ease}
+.calendar-grid button:hover{background:#e8fbff;transform:translateY(-1px)}
+.calendar-grid button.in-range{background:#dff7ff;border-radius:8px}
+.calendar-grid button.depart,.calendar-grid button.return{background:linear-gradient(135deg,#06b6d4,#8b5cf6);color:white;box-shadow:0 12px 26px rgba(14,165,233,.25)}
+.calendar-grid em{display:block;font-size:9px;font-style:normal;margin-top:2px;color:rgba(255,255,255,.9)}
+.apply-date{width:100%;margin-top:14px;border:0;border-radius:999px;padding:12px 16px;background:#102033;color:white;font-weight:900;cursor:pointer}
+
+.advanced{margin:18px 0 16px;padding:18px;border-radius:24px;background:rgba(255,255,255,.58);border:1px solid rgba(125,211,252,.22);color:#52687e}
+.advanced-head{display:flex;justify-content:space-between;gap:14px;align-items:end;margin-bottom:14px}
+.advanced h2{margin:0;color:#102033;font-size:18px;letter-spacing:-.03em}
+.advanced p{margin:0;color:#6b8197;font-size:13px;font-weight:700}
+.preference-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.preference{display:flex;align-items:center;gap:10px;text-align:left;border:1px solid rgba(14,165,233,.14);border-radius:16px;background:rgba(255,255,255,.72);color:#24465f;padding:13px;cursor:pointer;font-weight:850;transition:.2s ease}
+.preference .check{width:22px;height:22px;display:grid;place-items:center;flex:none;border-radius:7px;border:2px solid rgba(14,165,233,.38);color:transparent;background:white;font-size:13px}
+.preference.selected{background:linear-gradient(135deg,#dffbff,#f0e9ff);border-color:rgba(14,165,233,.45);color:#0e7490;box-shadow:0 12px 28px rgba(14,165,233,.12)}
+.preference.selected .check{background:linear-gradient(135deg,#06b6d4,#8b5cf6);border-color:transparent;color:white}
+
+.plan-shell{display:grid;gap:12px;flex:1;min-width:0}
+.plan-tabs{display:flex;justify-content:center;gap:8px;padding:7px;margin:0 auto;border-radius:999px;background:rgba(255,255,255,.28);border:1px solid rgba(255,255,255,.36);backdrop-filter:blur(18px)}
+.plan-tabs button{border:0;border-radius:999px;padding:10px 18px;background:transparent;color:rgba(255,255,255,.76);font-weight:900;cursor:pointer;transition:.22s ease}
+.plan-tabs button.active{background:white;color:#0e7490;box-shadow:0 12px 28px rgba(0,0,0,.12)}
+.plan-card{animation:planSlide .34s ease both}
+@keyframes planSlide{from{opacity:.2;transform:translateX(18px) scale(.985)}to{opacity:1;transform:none}}
+.arrow{background:rgba(255,255,255,.76);backdrop-filter:blur(18px)}
+
+@media (max-width:800px){
+.header nav{display:none}
+.progress{width:auto}
+.preference-grid{grid-template-columns:1fr}
+.calendar-panel{width:100%}
+.results{align-items:stretch}
+.plan-tabs{border-radius:20px;flex-wrap:wrap}
+}
