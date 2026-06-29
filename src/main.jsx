@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
@@ -91,14 +91,14 @@ const decisionBriefs = [
     weights: { cost: 34, reliability: 22, convenience: 14, hotelDistance: 12, risk: 18 },
     why: 'Recommended when budget pressure is highest; it accepts a moderate connection risk to keep the full trip comfortably below the cap.',
     alternatives: [
-      { label: 'Accepted', text: 'Nearby-airport nonstop lowered fare enough to remain a viable AI backup.' },
+      { label: 'Accepted', text: 'Nearby-airport nonstop lowered fare enough to remain a viable backup.' },
       { label: 'Rejected', text: 'Chicago connection improved coverage but arrived too late for the desired buffer.' },
     ],
   },
   {
     goal: 'Balance budget, nonstop reliability, and a hotel close to the client meeting without over-optimizing for any single factor.',
     weights: { cost: 22, reliability: 28, convenience: 18, hotelDistance: 16, risk: 16 },
-    why: 'This is the AI-recommended baseline because it keeps the traveler under budget, avoids layovers, and lands early enough for a calm evening arrival.',
+    why: 'This is the recommended baseline because it keeps the traveler under budget, avoids layovers, and lands early enough for a calm evening arrival.',
     alternatives: [
       { label: 'Accepted', text: 'JFK nonstop was kept as a fast backup because it improves arrival time with a small fare increase.' },
       { label: 'Rejected', text: 'Denver connection was deprioritized because extra connection risk outweighed the closer hotel.' },
@@ -198,12 +198,57 @@ const hotelRiskAdjustment = (hotel) => {
   return -0.1;
 };
 
+const timeToMinutes = (time) => {
+  const match = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return 18 * 60;
+  let hours = Number(match[1]) % 12;
+  if (match[3].toUpperCase() === 'PM') hours += 12;
+  return hours * 60 + Number(match[2]);
+};
+
+const distanceValue = (value) => Number(value.match(/([\d.]+)/)?.[1] ?? 1.5);
+
+const planFitFor = ({ total, riskScore, confidence, distance, arrival, score }) => {
+  const arrivalMinutes = timeToMinutes(arrival);
+  const earlyArrivalBonus = clamp((18 * 60 - arrivalMinutes) / 180, 0, 1);
+  const cost = clamp(100 - ((total - 900) / 900) * 42, 52, 99);
+  const reliability = clamp(confidence - (riskScore - 1) * 2, 60, 99);
+  const convenience = clamp(76 + earlyArrivalBonus * 18 - Math.max(0, distance - 0.6) * 7 - (riskScore > 2 ? 4 : 0), 58, 99);
+  const hotelDistance = clamp(100 - distance * 24, 58, 99);
+  const riskControl = clamp(104 - riskScore * 15 + earlyArrivalBonus * 6, 55, 99);
+  return {
+    cost: Math.round(cost),
+    reliability: Math.round(reliability),
+    convenience: Math.round(convenience),
+    hotelDistance: Math.round(hotelDistance),
+    riskControl: Math.round(riskControl),
+    total: Math.round(score),
+  };
+};
+
+const basePlanFit = (item, planPosition) => planFitFor({
+  total: currencyValue(item.cost),
+  riskScore: riskScores[item.risk] ?? 3,
+  confidence: Number(item.confidence.replace('%', '')),
+  distance: distanceValue(item.hotelDistance),
+  arrival: item.arrival,
+  score: item.score,
+});
+
+const alternativeReasonFor = (option, selected) => {
+  if (selected?.id === option.id) return 'Accepted into current plan';
+  if (option.scoreDelta > 0 && option.riskAdjustment <= 0) return 'Strong backup: improves score and controls risk';
+  if (option.scoreDelta > 0) return 'Accepted as a backup candidate';
+  if (option.riskAdjustment > 0.35) return 'Rejected: adds too much timing risk';
+  return 'Rejected for this priority';
+};
+
 const demoPlanFor = (item, planPosition, selectedFlights, selectedHotels, selectedAlternateRoutes = {}) => {
   const selectedFlight = selectedFlights[planPosition];
   const selectedHotel = selectedHotels[planPosition];
   const selectedAlternateRoute = selectedAlternateRoutes[planPosition];
   const changed = Boolean(selectedFlight || selectedHotel || selectedAlternateRoute);
-  if (!changed) return item;
+  if (!changed) return { ...item, planFit: basePlanFit(item, planPosition) };
 
   const base = planDemoPrices[planPosition];
   const flightPrice = selectedAlternateRoute?.flightPrice ?? (selectedFlight ? currencyValue(selectedFlight.price) : base.flight);
@@ -214,6 +259,8 @@ const demoPlanFor = (item, planPosition, selectedFlights, selectedHotels, select
   const confidence = clamp(Number(item.confidence.replace('%', '')) - ((riskScore - baseRisk) * 5) + (selectedFlight?.tag.toLowerCase().includes('lower-cost') ? -1 : 0) + (selectedHotel?.tag.toLowerCase().includes('refundable') ? 2 : 0) + (selectedAlternateRoute?.confidenceDelta ?? 0), 82, 99);
   const score = clamp(item.score + (selectedAlternateRoute?.scoreDelta ?? 0) + (confidence - Number(item.confidence.replace('%', ''))) * 0.25, 70, 99);
 
+  const hotelDistance = selectedAlternateRoute?.hotelDistance ?? selectedHotel?.distance?.replace(' to Empire State Building', ' from meeting') ?? item.hotelDistance;
+
   return {
     ...item,
     cost: formatCurrency(total),
@@ -223,8 +270,9 @@ const demoPlanFor = (item, planPosition, selectedFlights, selectedHotels, select
     hotel: selectedHotel ? formatHotel(selectedHotel) : selectedAlternateRoute ? `${item.hotel.split(' · ')[0]} · ${selectedAlternateRoute.hotelDistance}` : item.hotel,
     route: selectedAlternateRoute?.route ?? item.route,
     arrival: selectedAlternateRoute?.arrival ?? selectedFlight?.arrival ?? item.arrival,
-    hotelDistance: selectedAlternateRoute?.hotelDistance ?? selectedHotel?.distance?.replace(' to Empire State Building', ' from meeting') ?? item.hotelDistance,
+    hotelDistance,
     score: Math.round(score),
+    planFit: planFitFor({ total, riskScore, confidence, distance: distanceValue(hotelDistance), arrival: selectedAlternateRoute?.arrival ?? selectedFlight?.arrival ?? item.arrival, score }),
     explanation: selectedAlternateRoute?.explanation ?? item.explanation,
   };
 };
@@ -280,7 +328,7 @@ function App() {
 function IconGlyph({ icon }) { return <span className="glyph">{icon}</span>; }
 function TravelBackground() { return <div className="travel-bg" aria-hidden="true">{travelSlides.map((slide, index) => <span key={slide.label} style={{ backgroundImage: `url(${slide.image})`, animationDelay: `${index * 6}s` }} />)}</div>; }
 function Header() { return <header className="header"><div className="brand"><span className="logo-mark"><img src={`${import.meta.env.BASE_URL}justmove-logo.png`} alt="JustMove.AI logo" /></span><span>JustMove.AI</span></div><nav aria-label="Secondary prototype navigation"><button>Book</button><button>Trips</button><button>Alerts</button></nav></header>; }
-function Progress({ current }) { return <div className="progress">{['Input','AI Scan','Plans','Confirm','Monitor'].map((s,i)=><div className={`dot ${i<=current?'on':''}`} key={s}><span>{i+1}</span>{s}</div>)}</div>; }
+function Progress({ current }) { return <div className="progress">{['Input','Scan','Plans','Confirm','Monitor'].map((s,i)=><div className={`dot ${i<=current?'on':''}`} key={s}><span>{i+1}</span>{s}</div>)}</div>; }
 
 function BookingPage({ mode, setMode, onNext }) {
   const [booking, setBooking] = useState(defaultBookingValues);
@@ -314,7 +362,7 @@ function CalendarPanel({ value, onSelect }) {
 }
 
 
-function ProcessingPage() { const [active,setActive]=useState(0); useEffect(()=>{const id=setInterval(()=>setActive(v=>Math.min(v+1,4)),760); return()=>clearInterval(id)},[]); return <div className="card process-card appear"><div className="ai-core"><IconGlyph icon="✦"/><span/></div><h1>JustMove AI is planning your trip</h1><p className="processing-copy">The demo AI is comparing flight schedules, hotel proximity, meeting-time risk, total cost, and backup options before recommending three plans.</p><div className="steps">{steps.map((s,i)=><div className={`step ${i<=active?'done':''}`} key={s}><IconGlyph icon="✓"/>{s}</div>)}</div></div>; }
+function ProcessingPage() { const [active,setActive]=useState(0); useEffect(()=>{const id=setInterval(()=>setActive(v=>Math.min(v+1,4)),760); return()=>clearInterval(id)},[]); return <div className="card process-card appear"><div className="ai-core"><IconGlyph icon="✦"/><span/></div><h1>JustMove AI is planning your trip</h1><p className="processing-copy">JustMove is comparing flight schedules, hotel proximity, meeting-time risk, total cost, and backup options before recommending three plans.</p><div className="steps">{steps.map((s,i)=><div className={`step ${i<=active?'done':''}`} key={s}><IconGlyph icon="✓"/>{s}</div>)}</div></div>; }
 
 function ResultsPage({ index, setIndex, selectedFlights, setSelectedFlights, selectedHotels, setSelectedHotels, selectedAlternateRoutes, setSelectedAlternateRoutes, selectedPriority, setSelectedPriority, onConfirm }) {
   const [chooser, setChooser] = useState(null);
@@ -337,9 +385,48 @@ function ResultsPage({ index, setIndex, selectedFlights, setSelectedFlights, sel
     setSelectedAlternateRoutes((current) => ({ ...current, [strategy.planIndex]: alternate }));
   };
 
-  return <div className="results appear"><button className="arrow" aria-label="Previous plan" onClick={()=>setIndex((index+plans.length-1)%plans.length)}><IconGlyph icon="‹"/></button><div className="plan-shell"><div className="priority-panel"><span>AI priority override</span><div>{priorityStrategies.map((strategy)=><button type="button" key={strategy.id} className={selectedPriority===strategy.id?'active':''} onClick={()=>applyPriority(strategy)}>{strategy.label}</button>)}</div></div><div className="plan-tabs">{plans.map((item, planPosition)=><button key={item.name} className={planPosition===index?'active':''} onClick={()=>setIndex(planPosition)}>Plan {planPosition+1}</button>)}</div><div className="carousel-stage">{plans.map((item, planPosition)=>{ const displayPlan = planFor(item, planPosition); return <article className={`card plan-card ${item.accent} ${getPosition(planPosition)}`} aria-hidden={planPosition!==index} key={item.name}><div className="plan-head"><IconGlyph icon={item.icon}/><div><p><span className="ai-recommended">AI Recommended</span> Plan {planPosition+1} of 3</p><h1>{item.name}</h1></div></div><div className="metrics"><b>{displayPlan.cost}<span>Total cost</span></b><b>{displayPlan.arrival}<span>Arrival</span></b><b>{displayPlan.score}<span>Total score</span></b></div><Info icon={'✈'} label="Flight" value={displayPlan.flight} button onClick={()=>setChooser('flight')}/><Info icon={'▣'} label="Hotel" value={displayPlan.hotel} button onClick={()=>setChooser('hotel')}/><Info icon={'⌁'} label="Route" value={displayPlan.route}/><Info icon={'⌖'} label="Hotel distance" value={displayPlan.hotelDistance}/><Info icon={'⬡'} label="Risk" value={displayPlan.risk}/><DecisionBrief plan={displayPlan} brief={decisionBriefs[planPosition]} alternatives={alternateRouteOptions[planPosition]} selected={selectedAlternateRoutes[planPosition]} onSelect={(option)=>{setSelectedPriority('custom'); setSelectedAlternateRoutes((current)=>({ ...current, [planPosition]: current[planPosition]?.id === option.id ? undefined : option }));}}/><p className="explain"><IconGlyph icon="🤖"/>{displayPlan.explanation}</p>{planPosition===index && <button className="primary" onClick={onConfirm}>Approve AI-Built Plan</button>}</article>})}</div></div><button className="arrow" aria-label="Next plan" onClick={()=>setIndex((index+1)%plans.length)}><IconGlyph icon="›"/></button>{chooser && <ChoiceModal type={chooser} selected={chooser === 'flight' ? selectedFlights[index] : selectedHotels[index]} onSelect={selectChoice} onClose={()=>setChooser(null)} />}</div>;
+  return <div className="results appear"><button className="arrow" aria-label="Previous plan" onClick={()=>setIndex((index+plans.length-1)%plans.length)}><IconGlyph icon="‹"/></button><div className="plan-shell"><div className="priority-panel"><span>Plan priority</span><div>{priorityStrategies.map((strategy)=><button type="button" key={strategy.id} className={selectedPriority===strategy.id?'active':''} onClick={()=>applyPriority(strategy)}>{strategy.label}</button>)}</div></div><div className="plan-tabs">{plans.map((item, planPosition)=><button key={item.name} className={planPosition===index?'active':''} onClick={()=>setIndex(planPosition)}>Plan {planPosition+1}</button>)}</div><div className="carousel-stage">{plans.map((item, planPosition)=>{ const displayPlan = planFor(item, planPosition); return <article className={`card plan-card ${item.accent} ${getPosition(planPosition)}`} aria-hidden={planPosition!==index} key={item.name}><div className="plan-head"><IconGlyph icon={item.icon}/><div><p><span className="ai-recommended">Recommended</span> Plan {planPosition+1} of 3</p><h1>{item.name}</h1></div></div><div className="metrics"><b>{displayPlan.cost}<span>Total cost</span></b><b>{displayPlan.arrival}<span>Arrival</span></b><b>{displayPlan.score}<span>Total score</span></b></div><Info icon={'✈'} label="Flight" value={displayPlan.flight} button onClick={()=>setChooser('flight')}/><Info icon={'▣'} label="Hotel" value={displayPlan.hotel} button onClick={()=>setChooser('hotel')}/><Info icon={'⌁'} label="Route" value={displayPlan.route}/><Info icon={'⌖'} label="Hotel distance" value={displayPlan.hotelDistance}/><Info icon={'⬡'} label="Risk" value={displayPlan.risk}/><DecisionBrief plan={displayPlan} brief={decisionBriefs[planPosition]} alternatives={alternateRouteOptions[planPosition]} selected={selectedAlternateRoutes[planPosition]} onSelect={(option)=>{setSelectedPriority('custom'); setSelectedAlternateRoutes((current)=>({ ...current, [planPosition]: current[planPosition]?.id === option.id ? undefined : option }));}}/><p className="explain"><IconGlyph icon="🤖"/>{displayPlan.explanation}</p>{planPosition===index && <button className="primary" onClick={onConfirm}>Approve Plan</button>}</article>})}</div></div><button className="arrow" aria-label="Next plan" onClick={()=>setIndex((index+1)%plans.length)}><IconGlyph icon="›"/></button>{chooser && <ChoiceModal type={chooser} selected={chooser === 'flight' ? selectedFlights[index] : selectedHotels[index]} onSelect={selectChoice} onClose={()=>setChooser(null)} />}</div>;
 }
-function DecisionBrief({ plan, brief, alternatives, selected, onSelect }) { return <section className="decision-brief"><div className="brief-head"><span>AI Decision Brief</span><strong>AI Recommended</strong></div><p><b>User goal:</b> {brief.goal}</p><div className="weights">{Object.entries(brief.weights).map(([label,value])=><div key={label}><span>{label === 'hotelDistance' ? 'Hotel distance' : label}</span><strong>{value}%</strong><i style={{ width: `${value}%` }}/></div>)}</div><p><b>Why recommended:</b> {plan.explanation || brief.why}</p><div className="brief-alternatives"><span>AI evaluated alternatives</span>{alternatives.map((option, optionIndex)=><button type="button" key={option.id} className={selected?.id === option.id ? 'selected' : ''} onClick={()=>onSelect(option)}><strong>{option.label}</strong><em>{option.route} · arrives {option.arrival}</em><small>{selected?.id === option.id ? 'Accepted into recommendation' : optionIndex % 2 === 0 ? 'Accepted as backup candidate' : 'Rejected for this priority'}</small></button>)}</div><ul>{brief.alternatives.map((item)=><li key={`${item.label}-${item.text}`}><strong>{item.label}:</strong> {item.text}</li>)}</ul></section>; }
+function DecisionBrief({ plan, brief, alternatives, selected, onSelect }) {
+  const metrics = [
+    ['cost', 'Cost score'],
+    ['reliability', 'Reliability'],
+    ['convenience', 'Convenience'],
+    ['hotelDistance', 'Hotel distance'],
+    ['riskControl', 'Risk Control'],
+    ['total', 'Overall total'],
+  ];
+
+  return <section className="decision-brief"><div className="brief-head"><span>Decision Brief</span><strong>Recommended</strong></div><p><b>User goal:</b> {brief.goal}</p><div className="fit-title">Current Plan Scores</div><div className="weights plan-fit">{metrics.map(([key,label])=><AnimatedScore key={key} label={label} value={plan.planFit?.[key] ?? brief.weights[key] ?? plan.score} />)}</div><p><b>Why this plan:</b> {plan.explanation || brief.why}</p><div className="brief-alternatives"><span>Alternatives checked</span>{alternatives.map((option)=><button type="button" key={option.id} className={selected?.id === option.id ? 'selected' : ''} onClick={()=>onSelect(option)}><strong>{option.label}</strong><em>{option.route} · arrives {option.arrival}</em><small>{alternativeReasonFor(option, selected)}</small></button>)}</div><ul>{brief.alternatives.map((item)=><li key={`${item.label}-${item.text}`}><strong>{item.label}:</strong> {item.text}</li>)}</ul></section>;
+}
+
+function AnimatedScore({ label, value }) {
+  const [displayValue, setDisplayValue] = useState(value);
+  const [direction, setDirection] = useState('');
+  const previousValue = useRef(value);
+
+  useEffect(() => {
+    const start = previousValue.current;
+    if (start === value) return;
+    const delta = value - start;
+    previousValue.current = value;
+    setDirection(delta > 0 ? 'improved' : 'worse');
+    const steps = 10;
+    let currentStep = 0;
+    const timer = setInterval(() => {
+      currentStep += 1;
+      setDisplayValue(Math.round(start + (delta * currentStep) / steps));
+      if (currentStep >= steps) clearInterval(timer);
+    }, 28);
+    const clearFlash = setTimeout(() => setDirection(''), 720);
+    return () => {
+      clearInterval(timer);
+      clearTimeout(clearFlash);
+    };
+  }, [value]);
+
+  return <div className={direction}><span>{label}</span><strong>{displayValue}%</strong><i style={{ width: `${displayValue}%` }}/></div>;
+}
 function Info({icon:Icon,label,value,button,onClick}){const Tag=button?'button':'div';return <Tag type={button?'button':undefined} className={`info ${button?'clickable':''}`} onClick={onClick}><IconGlyph icon={Icon}/><span>{label}</span><strong>{value}</strong>{button && <em>Change</em>}</Tag>}
 
 function ChoiceModal({ type, selected, onSelect, onClose }) {
@@ -347,7 +434,7 @@ function ChoiceModal({ type, selected, onSelect, onClose }) {
   const options = isFlight ? flightOptions : hotelOptions;
   return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="choice-modal" role="dialog" aria-modal="true" aria-label={isFlight ? 'Flight options' : 'Hotel options'} onClick={(event)=>event.stopPropagation()}><div className="modal-head"><div><span>{isFlight ? 'SFO → NYC demo flights' : 'NYC demo hotels'}</span><h2>{isFlight ? 'Choose a flight option' : 'Choose a hotel option'}</h2></div><button type="button" aria-label="Close options" onClick={onClose}>×</button></div><div className="choice-list">{options.map((option)=>{ const active = selected && (isFlight ? selected.airline === option.airline : selected.name === option.name); return <button type="button" className={`choice-card ${active ? 'selected' : ''}`} key={isFlight ? option.airline : option.name} onClick={()=>onSelect(option)}><div className="choice-title"><strong>{isFlight ? option.airline : option.name}</strong><span>{isFlight ? option.price : option.rate}</span></div><p>{isFlight ? option.route : option.location}</p><div className="choice-meta">{isFlight ? <><span>{option.departure} → {option.arrival}</span><span>{option.stops}</span><span>{option.duration}</span><em>{option.tag}</em></> : <><span>{option.distance}</span><span>{option.tag}</span><em>{option.rating}</em></>}</div></button>})}</div></section></div>;
 }
-function ConfirmPage({ plan, onConfirm, onEdit }) { return <div className="card confirm-card appear"><h1>Approve AI-Built Travel Plan</h1><p className="notice"><IconGlyph icon="⬡"/>JustMove.AI built this plan from your goal, budget, timing risk, hotel distance, and backup-route analysis. It will not book anything until you approve the AI-built plan below.</p><div className="summary"><div className="summary-hero"><IconGlyph icon={plan.icon}/><div><span>AI recommended plan awaiting approval</span><strong>{plan.name}</strong><p>{plan.explanation}</p></div></div><div className="summary-grid"><Info icon={'◫'} label="Mock total" value={plan.cost}/><Info icon={'◴'} label="Arrival" value={plan.arrival}/><Info icon={'⬡'} label="Score" value={`${plan.score} / 100`}/><Info icon={'⬡'} label="Risk" value={plan.risk}/><Info icon={'⌁'} label="Route" value={plan.route}/><Info icon={'▣'} label="Stay" value={plan.hotel}/><Info icon={'◴'} label="Meeting" value="Empire State Building · 10:00 AM"/></div></div><div className="actions"><button className="primary" onClick={onConfirm}>Approve & Book AI Plan</button><button onClick={onEdit}>Refine AI Plan</button><button>Ask AI Why</button></div></div>; }
-function MonitorPage({ onReset }) { return <div className="card monitor-card appear"><div className="alert"><IconGlyph icon="🔔"/>Sample AI disruption alert</div><h1>AI Travel Agent Monitoring</h1><p>JustMove is watching the approved plan for flight delays, fare and rebooking price changes, hotel availability or quality issues, ground-transfer risk, and backup route opportunities.</p><div className="watch-grid"><span>Delays: active</span><span>Price changes: active</span><span>Hotel issues: active</span><span>Backup routes: active</span></div><div className="backup disruption"><h2>AI-recommended backup plan</h2><p>Your original SFO → EWR flight is projected 48 minutes late and would shrink the meeting buffer. The AI recommends switching to an earlier SFO → JFK nonstop and keeping the same Midtown hotel.</p><Info icon={'✈'} label="Backup route" value="Earlier SFO → JFK nonstop · arrives 8:42 PM"/><Info icon={'◈'} label="Budget impact" value="+$96 · still under $1,800"/><Info icon={'⬡'} label="Risk reduction" value="Meeting-delay risk drops to Very Low"/></div><div className="actions"><button onClick={onReset}>Keep Current Plan</button><button className="primary" onClick={onReset}>Approve AI Backup</button></div></div>; }
+function ConfirmPage({ plan, onConfirm, onEdit }) { return <div className="card confirm-card appear"><h1>Approve Travel Plan</h1><p className="notice"><IconGlyph icon="⬡"/>JustMove.AI built this plan from your goal, budget, timing risk, hotel distance, and backup-route analysis. It will not book anything until you approve the plan below.</p><div className="summary"><div className="summary-hero"><IconGlyph icon={plan.icon}/><div><span>Recommended plan awaiting approval</span><strong>{plan.name}</strong><p>{plan.explanation}</p></div></div><div className="summary-grid"><Info icon={'◫'} label="Mock total" value={plan.cost}/><Info icon={'◴'} label="Arrival" value={plan.arrival}/><Info icon={'⬡'} label="Score" value={`${plan.score} / 100`}/><Info icon={'⬡'} label="Risk" value={plan.risk}/><Info icon={'⌁'} label="Route" value={plan.route}/><Info icon={'▣'} label="Stay" value={plan.hotel}/><Info icon={'◴'} label="Meeting" value="Empire State Building · 10:00 AM"/></div></div><div className="actions"><button className="primary" onClick={onConfirm}>Approve & Book Plan</button><button onClick={onEdit}>Refine Plan</button><button>Why this plan</button></div></div>; }
+function MonitorPage({ onReset }) { return <div className="card monitor-card appear"><div className="alert"><IconGlyph icon="🔔"/>Sample disruption alert</div><h1>Trip Monitor</h1><p>JustMove is watching the approved plan for flight delays, fare and rebooking price changes, hotel availability or quality issues, ground-transfer risk, and backup route opportunities.</p><div className="watch-grid"><span>Delays: active</span><span>Price changes: active</span><span>Hotel issues: active</span><span>Backup routes: active</span></div><div className="backup disruption"><h2>Recommended backup plan</h2><p>Your original SFO → EWR flight is projected 48 minutes late and would shrink the meeting buffer. JustMove recommends switching to an earlier SFO → JFK nonstop and keeping the same Midtown hotel.</p><Info icon={'✈'} label="Backup route" value="Earlier SFO → JFK nonstop · arrives 8:42 PM"/><Info icon={'◈'} label="Budget impact" value="+$96 · still under $1,800"/><Info icon={'⬡'} label="Risk reduction" value="Meeting-delay risk drops to Very Low"/></div><div className="actions"><button onClick={onReset}>Keep Current Plan</button><button className="primary" onClick={onReset}>Approve Backup</button></div></div>; }
 
 createRoot(document.getElementById('root')).render(<App />);
