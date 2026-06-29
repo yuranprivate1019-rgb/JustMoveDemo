@@ -2,29 +2,33 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
-const cityOptions = [
-  'San Francisco / SFO',
-  'New York / NYC',
-  'Los Angeles / LAX',
-  'Chicago / ORD',
-  'Seattle / SEA',
-  'Boston / BOS',
-  'Washington DC / DCA',
-  'Miami / MIA',
-  'Dallas / DFW',
-  'Atlanta / ATL',
-  'Denver / DEN',
-  'Las Vegas / LAS',
-  'Houston / IAH',
-  'Phoenix / PHX',
-  'Orlando / MCO',
-  'Philadelphia / PHL',
+const cityProfiles = [
+  { city: 'San Francisco', code: 'SFO', meetings: ['Salesforce Tower', 'Ferry Building', 'Moscone Center'], zones: ['SoMa', 'Financial District', 'Union Square'] },
+  { city: 'New York', code: 'NYC', meetings: ['Empire State Building', 'Hudson Yards', 'World Trade Center'], zones: ['Midtown', 'Chelsea', 'Financial District'] },
+  { city: 'Los Angeles', code: 'LAX', meetings: ['Century City Plaza', 'Downtown LA Arts District', 'Santa Monica Business Park'], zones: ['Century City', 'Downtown LA', 'Santa Monica'] },
+  { city: 'Chicago', code: 'ORD', meetings: ['Willis Tower', 'River North Conference Center', 'Fulton Market Offices'], zones: ['Loop', 'River North', 'West Loop'] },
+  { city: 'Seattle', code: 'SEA', meetings: ['South Lake Union Campus', 'Pike Place Market Offices', 'Bellevue Downtown Center'], zones: ['South Lake Union', 'Downtown', 'Bellevue'] },
+  { city: 'Boston', code: 'BOS', meetings: ['Seaport Innovation Center', 'Kendall Square', 'Back Bay Conference Center'], zones: ['Seaport', 'Cambridge', 'Back Bay'] },
+  { city: 'Washington DC', code: 'DCA', meetings: ['K Street Offices', 'Capitol Hill Conference Center', 'Navy Yard Business Center'], zones: ['Downtown', 'Capitol Hill', 'Navy Yard'] },
+  { city: 'Miami', code: 'MIA', meetings: ['Brickell City Centre', 'Wynwood Business Hub', 'Downtown Miami Tower'], zones: ['Brickell', 'Downtown', 'Wynwood'] },
+  { city: 'Dallas', code: 'DFW', meetings: ['Uptown Dallas Offices', 'Arts District Center', 'Las Colinas Campus'], zones: ['Uptown', 'Downtown', 'Las Colinas'] },
+  { city: 'Atlanta', code: 'ATL', meetings: ['Midtown Tech Square', 'Buckhead Financial Center', 'Downtown Convention Center'], zones: ['Midtown', 'Buckhead', 'Downtown'] },
+  { city: 'Denver', code: 'DEN', meetings: ['Union Station Offices', 'LoDo Conference Center', 'Cherry Creek Business Plaza'], zones: ['LoDo', 'Downtown', 'Cherry Creek'] },
+  { city: 'Las Vegas', code: 'LAS', meetings: ['Convention Center West Hall', 'The Strip Business Suites', 'Downtown Vegas Offices'], zones: ['Convention Center', 'The Strip', 'Downtown'] },
+  { city: 'Houston', code: 'IAH', meetings: ['Energy Corridor Campus', 'Downtown Houston Tower', 'Galleria Business Center'], zones: ['Downtown', 'Galleria', 'Energy Corridor'] },
+  { city: 'Phoenix', code: 'PHX', meetings: ['Downtown Phoenix Offices', 'Tempe Town Lake Campus', 'Scottsdale Quarter'], zones: ['Downtown', 'Tempe', 'Scottsdale'] },
+  { city: 'Orlando', code: 'MCO', meetings: ['Lake Nona Business Park', 'Downtown Orlando Center', 'Convention Center District'], zones: ['Downtown', 'Lake Nona', 'I-Drive'] },
+  { city: 'Philadelphia', code: 'PHL', meetings: ['Center City Offices', 'University City Campus', 'Navy Yard Business Center'], zones: ['Center City', 'University City', 'Navy Yard'] },
 ];
+
+const cityOptions = cityProfiles.map(({ city, code }) => `${city} / ${code}`);
+const cityProfileByOption = Object.fromEntries(cityProfiles.map((profile) => [`${profile.city} / ${profile.code}`, profile]));
+const routeKeyFor = (from, to) => `${cityProfileByOption[from]?.code}-${cityProfileByOption[to]?.code}`;
+
 
 const bookingOptions = {
   Dates: ['Tue, Jul 14 → Thu, Jul 16', 'Mon, Aug 3 → Wed, Aug 5', 'Fri, Sep 11 → Sun, Sep 13'],
   Travelers: ['1 traveler', '2 travelers', '4 travelers'],
-  'Meeting Location': ['Empire State Building', 'Hudson Yards', 'World Trade Center'],
   'Meeting Time': ['9:00 AM', '10:00 AM', '2:00 PM'],
   Budget: ['under $1,500', 'under $1,800', 'under $2,200'],
   'Hotel Nightly Cap': ['$260 / night', '$320 / night', '$420 / night'],
@@ -172,6 +176,65 @@ const planDemoPrices = [
 const currencyValue = (value) => Number(value.match(/\$([\d,]+)/)?.[1].replace(',', '') ?? 0);
 const formatCurrency = (value) => `$${Math.round(value).toLocaleString()}`;
 
+const makeRouteData = ({ fromCode, toCode, destination, meeting, routeName, recommendedPlanIndex = RECOMMENDED_PLAN_INDEX, costShift = 0, arrival = '3:58 PM', risk = 'Low' }) => {
+  const destinationFirstName = destination.split(' ')[0];
+  const localPlans = plans.map((plan, index) => ({
+    ...plan,
+    name: index === recommendedPlanIndex ? `Best ${destinationFirstName} Plan` : plan.name,
+    cost: formatCurrency(currencyValue(plan.cost) + costShift + index * 38),
+    route: index === 0 ? `${fromCode} → ${toCode} value route` : index === 1 ? `${fromCode} → ${toCode} nonstop` : `${fromCode} → ${toCode} early nonstop`,
+    arrival: index === recommendedPlanIndex ? arrival : plan.arrival,
+    risk: index === recommendedPlanIndex ? risk : plan.risk,
+    flight: `${fromCode} → ${toCode} · ${index === 2 ? '6:00 AM' : index === 1 ? '7:25 AM' : '8:10 AM'} · ${index === 0 ? '1 short layover' : 'nonstop'}`,
+    hotel: `${cityProfileByOption[`${destination} / ${toCode}`]?.zones?.[0] ?? 'Central'} business hotel · ${plan.hotelDistance}`,
+    explanation: `Builds a complete ${routeName} plan around the ${meeting} meeting, balancing airfare, arrival buffer, hotel proximity, and disruption recovery.`,
+  }));
+  const localAlternates = alternateRouteOptions.map((group) => group.map((option) => ({
+    ...option,
+    route: option.route.replace(/SFO|OAK|SJC/g, fromCode).replace(/JFK|EWR|LGA/g, toCode),
+    explanation: option.explanation.replace(/New York|Midtown|JFK|EWR|LGA|SFO|Oakland|San Jose|Bay Area/g, destination),
+  })));
+  const localFlights = flightOptions.map((flight) => ({ ...flight, route: `${fromCode} → ${toCode}` }));
+  const localHotels = hotelOptions.map((hotel, index) => ({
+    ...hotel,
+    name: `${destination} ${hotel.name.split(' ').slice(0, 2).join(' ')}`,
+    location: cityProfileByOption[`${destination} / ${toCode}`]?.zones?.[index % 3] ?? hotel.location,
+    distance: hotel.distance.replace('Empire State Building', meeting),
+  }));
+  return {
+    recommendedPlanIndex,
+    plans: localPlans,
+    alternateRouteOptions: localAlternates,
+    flightOptions: localFlights,
+    hotelOptions: localHotels,
+    decisionBriefs: decisionBriefs.map((brief) => ({
+      ...brief,
+      goal: `Get the traveler from ${fromCode} to a ${meeting} meeting in ${destination} under budget with enough arrival buffer to absorb disruption.`,
+      why: `JustMove recommends this route because it packages the flight, hotel zone, ground buffer, and backup options into one approval-ready business trip plan.`,
+    })),
+    confirmDetails: { meeting: `${meeting} · 10:00 AM`, approvalCopy: `Approve the complete ${routeName} plan for flights, hotel, ground buffer, and monitoring.` },
+    monitoringExample: { alert: `Sample ${destination} disruption alert`, backup: `JustMove found an earlier ${fromCode} → ${toCode} option that preserves the meeting buffer while keeping the hotel unchanged.` },
+  };
+};
+
+const showcaseRouteDefinitions = [
+  ['SFO-NYC', 'San Francisco', 'SFO', 'New York', 'NYC', 'Empire State Building', 'San Francisco → New York', 1, 0, '3:58 PM', 'Low'],
+  ['LAX-NYC', 'Los Angeles', 'LAX', 'New York', 'NYC', 'Hudson Yards', 'Los Angeles → New York', 1, -80, '4:12 PM', 'Low'],
+  ['ORD-BOS', 'Chicago', 'ORD', 'Boston', 'BOS', 'Seaport Innovation Center', 'Chicago → Boston', 1, -210, '2:55 PM', 'Low'],
+  ['SEA-DCA', 'Seattle', 'SEA', 'Washington DC', 'DCA', 'K Street Offices', 'Seattle → Washington DC', 2, 110, '3:05 PM', 'Very Low'],
+  ['DFW-ATL', 'Dallas', 'DFW', 'Atlanta', 'ATL', 'Midtown Tech Square', 'Dallas → Atlanta', 1, -260, '1:48 PM', 'Low'],
+  ['DEN-LAS', 'Denver', 'DEN', 'Las Vegas', 'LAS', 'Convention Center West Hall', 'Denver → Las Vegas', 0, -340, '12:38 PM', 'Medium'],
+  ['MIA-PHL', 'Miami', 'MIA', 'Philadelphia', 'PHL', 'Center City Offices', 'Miami → Philadelphia', 1, -120, '3:18 PM', 'Low'],
+  ['IAH-PHX', 'Houston', 'IAH', 'Phoenix', 'PHX', 'Downtown Phoenix Offices', 'Houston → Phoenix', 1, -190, '2:44 PM', 'Low'],
+  ['BOS-ORD', 'Boston', 'BOS', 'Chicago', 'ORD', 'Willis Tower', 'Boston → Chicago', 2, -160, '1:35 PM', 'Very Low'],
+  ['ATL-MIA', 'Atlanta', 'ATL', 'Miami', 'MIA', 'Brickell City Centre', 'Atlanta → Miami', 1, -300, '12:50 PM', 'Low'],
+  ['PHX-SFO', 'Phoenix', 'PHX', 'San Francisco', 'SFO', 'Salesforce Tower', 'Phoenix → San Francisco', 1, -220, '2:20 PM', 'Low'],
+  ['DCA-SEA', 'Washington DC', 'DCA', 'Seattle', 'SEA', 'South Lake Union Campus', 'Washington DC → Seattle', 2, 140, '4:06 PM', 'Very Low'],
+];
+
+const showcaseRoutes = Object.fromEntries(showcaseRouteDefinitions.map(([key, , fromCode, destination, toCode, meeting, routeName, recommendedPlanIndex, costShift, arrival, risk]) => [key, makeRouteData({ fromCode, toCode, destination, meeting, routeName, recommendedPlanIndex, costShift, arrival, risk })]));
+
+
 const riskScores = {
   'Very Low': 1,
   Low: 2,
@@ -287,9 +350,14 @@ function App() {
   const [selectedHotels, setSelectedHotels] = useState({});
   const [selectedAlternateRoutes, setSelectedAlternateRoutes] = useState({});
   const [selectedPriority, setSelectedPriority] = useState('comfort');
-  const plan = demoPlanFor(plans[planIndex], planIndex, selectedFlights, selectedHotels, selectedAlternateRoutes);
+  const [booking, setBooking] = useState(defaultBookingValues);
+  const [routeData, setRouteData] = useState(showcaseRoutes[routeKeyFor(defaultBookingValues.From, defaultBookingValues.To)]);
+  const activePlans = routeData?.plans ?? [];
+  const plan = routeData ? demoPlanFor(activePlans[planIndex], planIndex, selectedFlights, selectedHotels, selectedAlternateRoutes) : null;
   const resetGeneratedPlanState = () => {
-    setPlanIndex(RECOMMENDED_PLAN_INDEX);
+    const nextRoute = showcaseRoutes[routeKeyFor(booking.From, booking.To)];
+    setRouteData(nextRoute);
+    setPlanIndex(nextRoute?.recommendedPlanIndex ?? RECOMMENDED_PLAN_INDEX);
     setSelectedFlights({});
     setSelectedHotels({});
     setSelectedAlternateRoutes({});
@@ -316,11 +384,11 @@ function App() {
     <Header />
     <Progress current={currentStep} />
     <section className="stage">
-      {page === 'book' && <BookingPage mode={mode} setMode={setMode} onNext={resetGeneratedPlanState} />}
+      {page === 'book' && <BookingPage mode={mode} setMode={setMode} booking={booking} setBooking={setBooking} onNext={resetGeneratedPlanState} onRouteInputChange={() => { setPlanIndex(RECOMMENDED_PLAN_INDEX); setSelectedFlights({}); setSelectedHotels({}); setSelectedAlternateRoutes({}); }} />}
       {page === 'processing' && <ProcessingPage />}
-      {page === 'results' && <ResultsPage plan={plan} index={planIndex} setIndex={setPlanIndex} selectedFlights={selectedFlights} setSelectedFlights={setSelectedFlights} selectedHotels={selectedHotels} setSelectedHotels={setSelectedHotels} selectedAlternateRoutes={selectedAlternateRoutes} setSelectedAlternateRoutes={setSelectedAlternateRoutes} selectedPriority={selectedPriority} setSelectedPriority={setSelectedPriority} onConfirm={() => setPage('confirm')} />}
-      {page === 'confirm' && <ConfirmPage plan={plan} onConfirm={() => setPage('monitor')} onEdit={() => setPage('results')} />}
-      {page === 'monitor' && <MonitorPage onReset={() => setPage('book')} />}
+      {page === 'results' && (routeData ? <ResultsPage routeData={routeData} plan={plan} index={planIndex} setIndex={setPlanIndex} selectedFlights={selectedFlights} setSelectedFlights={setSelectedFlights} selectedHotels={selectedHotels} setSelectedHotels={setSelectedHotels} selectedAlternateRoutes={selectedAlternateRoutes} setSelectedAlternateRoutes={setSelectedAlternateRoutes} selectedPriority={selectedPriority} setSelectedPriority={setSelectedPriority} onConfirm={() => setPage('confirm')} /> : <UnsupportedRouteMessage onBack={() => setPage('book')} />)}
+      {page === 'confirm' && <ConfirmPage plan={plan} routeData={routeData} onConfirm={() => setPage('monitor')} onEdit={() => setPage('results')} />}
+      {page === 'monitor' && <MonitorPage routeData={routeData} onReset={() => setPage('book')} />}
     </section>
   </main>;
 }
@@ -330,27 +398,31 @@ function TravelBackground() { return <div className="travel-bg" aria-hidden="tru
 function Header() { return <header className="header"><div className="brand"><span className="logo-mark"><img src={`${import.meta.env.BASE_URL}justmove-logo.png`} alt="JustMove.AI logo" /></span><span>JustMove.AI</span></div><nav aria-label="Secondary prototype navigation"><button>Book</button><button>Trips</button><button>Alerts</button></nav></header>; }
 function Progress({ current }) { return <div className="progress">{['Input','Scan','Plans','Confirm','Monitor'].map((s,i)=><div className={`dot ${i<=current?'on':''}`} key={s}><span>{i+1}</span>{s}</div>)}</div>; }
 
-function BookingPage({ mode, setMode, onNext }) {
-  const [booking, setBooking] = useState(defaultBookingValues);
+function BookingPage({ mode, setMode, booking, setBooking, onNext, onRouteInputChange }) {
   const [openField, setOpenField] = useState(null);
   const [citySearch, setCitySearch] = useState('');
   const [preferences, setPreferences] = useState(['Nonstop', 'Near meeting location']);
 
   const filteredCities = useMemo(() => cityOptions.filter((option) => option.toLowerCase().includes(citySearch.toLowerCase())), [citySearch]);
   const selectOption = (label, value) => {
-    setBooking((current) => ({ ...current, [label]: value }));
+    setBooking((current) => {
+      const next = { ...current, [label]: value };
+      if (label === 'To') next['Meeting Location'] = cityProfileByOption[value]?.meetings[0] ?? next['Meeting Location'];
+      return next;
+    });
+    if (label === 'To') onRouteInputChange();
     setOpenField(null);
     setCitySearch('');
   };
   const togglePreference = (preference) => setPreferences((current) => current.includes(preference) ? current.filter((item) => item !== preference) : [...current, preference]);
 
-  return <div className="card booking-card appear"><div className="switch"><button className={mode==='guided'?'active':''} onClick={()=>setMode('guided')}>Guided Booking</button><button className={mode==='describe'?'active':''} onClick={()=>setMode('describe')}>Describe Your Trip</button></div>{mode==='guided'?<><div className="grid">{guidedFields.map(([label,Icon])=><div className="field-wrap" key={label}><button className={`field ${openField===label?'open':''}`} type="button" onClick={()=>setOpenField(openField===label?null:label)}><span><IconGlyph icon={Icon}/>{label}</span><strong>{booking[label]}</strong><em>{label === 'Dates' ? 'Open calendar' : 'Tap to change'}</em></button>{openField===label && <OptionPanel label={label} value={booking[label]} citySearch={citySearch} setCitySearch={setCitySearch} cityOptions={filteredCities} onSelect={(value)=>selectOption(label,value)} />}</div>)}</div><section className="advanced"><div className="advanced-head"><h2>Advanced Preferences</h2><p>Select what matters most for this trip.</p></div><div className="preference-grid">{advancedPreferenceOptions.map((preference)=><button className={`preference ${preferences.includes(preference)?'selected':''}`} type="button" key={preference} onClick={()=>togglePreference(preference)}><span className="check">✓</span>{preference}</button>)}</div></section></>:<div className="describe"><label>Tell JustMove what you need</label><textarea defaultValue="I need to travel from San Francisco to New York for a client meeting near the Empire State Building. Keep the total trip under $1,800, avoid risky layovers, and choose a hotel close to the meeting." /></div>}<button className="primary" onClick={onNext}><IconGlyph icon="⚡"/>Generate Plans</button></div>;
+  return <div className="card booking-card appear"><div className="switch"><button className={mode==='guided'?'active':''} onClick={()=>setMode('guided')}>Guided Booking</button><button className={mode==='describe'?'active':''} onClick={()=>setMode('describe')}>Describe Your Trip</button></div>{mode==='guided'?<><div className="grid">{guidedFields.map(([label,Icon])=><div className="field-wrap" key={label}><button className={`field ${openField===label?'open':''}`} type="button" onClick={()=>setOpenField(openField===label?null:label)}><span><IconGlyph icon={Icon}/>{label}</span><strong>{booking[label]}</strong><em>{label === 'Dates' ? 'Open calendar' : 'Tap to change'}</em></button>{openField===label && <OptionPanel label={label} value={booking[label]} booking={booking} citySearch={citySearch} setCitySearch={setCitySearch} cityOptions={filteredCities} onSelect={(value)=>selectOption(label,value)} />}</div>)}</div><section className="advanced"><div className="advanced-head"><h2>Advanced Preferences</h2><p>Select what matters most for this trip.</p></div><div className="preference-grid">{advancedPreferenceOptions.map((preference)=><button className={`preference ${preferences.includes(preference)?'selected':''}`} type="button" key={preference} onClick={()=>togglePreference(preference)}><span className="check">✓</span>{preference}</button>)}</div></section></>:<div className="describe"><label>Tell JustMove what you need</label><textarea defaultValue="I need to travel from San Francisco to New York for a client meeting near the Empire State Building. Keep the total trip under $1,800, avoid risky layovers, and choose a hotel close to the meeting." /></div>}<button className="primary" onClick={onNext}><IconGlyph icon="⚡"/>Create Plan</button></div>;
 }
 
-function OptionPanel({ label, value, citySearch, setCitySearch, cityOptions, onSelect }) {
+function OptionPanel({ label, value, booking, citySearch, setCitySearch, cityOptions, onSelect }) {
   const isCity = label === 'From' || label === 'To';
   if (label === 'Dates') return <CalendarPanel value={value} onSelect={onSelect} />;
-  const options = isCity ? cityOptions : bookingOptions[label];
+  const options = label === 'Meeting Location' ? cityProfileByOption[booking.To]?.meetings ?? [] : isCity ? cityOptions : bookingOptions[label];
   return <div className={`option-panel ${isCity ? 'search-panel' : ''}`}>
     {isCity && <input className="search-box" value={citySearch} onChange={(event)=>setCitySearch(event.target.value)} placeholder={`Search ${label.toLowerCase()} city or airport`} autoFocus />}
     <div className="option-list">{options.map((option)=><button className={option===value?'selected':''} type="button" key={option} onClick={()=>onSelect(option)}>{option}</button>)}</div>
@@ -362,13 +434,16 @@ function CalendarPanel({ value, onSelect }) {
 }
 
 
+
+function UnsupportedRouteMessage({ onBack }) { return <div className="card process-card unsupported-route appear"><h1>Route preview coming soon</h1><p>This demo route is not fully available yet. Try San Francisco → New York, Los Angeles → New York, or Chicago → Boston.</p><button className="primary" onClick={onBack}>Choose a supported demo route</button></div>; }
+
 function ProcessingPage() { const [active,setActive]=useState(0); useEffect(()=>{const id=setInterval(()=>setActive(v=>Math.min(v+1,4)),760); return()=>clearInterval(id)},[]); return <div className="card process-card appear"><div className="ai-core"><IconGlyph icon="✦"/><span/></div><h1>JustMove AI is planning your trip</h1><p className="processing-copy">JustMove is comparing flight schedules, hotel proximity, meeting-time risk, total cost, and backup options before recommending three plans.</p><div className="steps">{steps.map((s,i)=><div className={`step ${i<=active?'done':''}`} key={s}><IconGlyph icon="✓"/>{s}</div>)}</div></div>; }
 
-function ResultsPage({ index, setIndex, selectedFlights, setSelectedFlights, selectedHotels, setSelectedHotels, selectedAlternateRoutes, setSelectedAlternateRoutes, selectedPriority, setSelectedPriority, onConfirm }) {
+function ResultsPage({ routeData, index, setIndex, selectedFlights, setSelectedFlights, selectedHotels, setSelectedHotels, selectedAlternateRoutes, setSelectedAlternateRoutes, selectedPriority, setSelectedPriority, onConfirm }) {
   const [chooser, setChooser] = useState(null);
   const getPosition = (planPosition) => {
     if (planPosition === index) return 'active';
-    if (planPosition === (index + 1) % plans.length) return 'next';
+    if (planPosition === (index + 1) % routeData.plans.length) return 'next';
     return 'prev';
   };
   const planFor = (item, planPosition) => demoPlanFor(item, planPosition, selectedFlights, selectedHotels, selectedAlternateRoutes);
@@ -379,13 +454,13 @@ function ResultsPage({ index, setIndex, selectedFlights, setSelectedFlights, sel
     setChooser(null);
   };
   const applyPriority = (strategy) => {
-    const alternate = alternateRouteOptions[strategy.planIndex].find((option) => option.id === strategy.alternateId);
+    const alternate = routeData.alternateRouteOptions[strategy.planIndex].find((option) => option.id === strategy.alternateId);
     setSelectedPriority(strategy.id);
     setIndex(strategy.planIndex);
     setSelectedAlternateRoutes((current) => ({ ...current, [strategy.planIndex]: alternate }));
   };
 
-  return <div className="results appear"><button className="arrow" aria-label="Previous plan" onClick={()=>setIndex((index+plans.length-1)%plans.length)}><IconGlyph icon="‹"/></button><div className="plan-shell"><div className="priority-panel"><span>Plan priority</span><div>{priorityStrategies.map((strategy)=><button type="button" key={strategy.id} className={selectedPriority===strategy.id?'active':''} onClick={()=>applyPriority(strategy)}>{strategy.label}</button>)}</div></div><div className="plan-tabs">{plans.map((item, planPosition)=><button key={item.name} className={planPosition===index?'active':''} onClick={()=>setIndex(planPosition)}>Plan {planPosition+1}</button>)}</div><div className="carousel-stage">{plans.map((item, planPosition)=>{ const displayPlan = planFor(item, planPosition); return <article className={`card plan-card ${item.accent} ${getPosition(planPosition)}`} aria-hidden={planPosition!==index} key={item.name}><div className="plan-head"><IconGlyph icon={item.icon}/><div><p><span className="ai-recommended">Recommended</span> Plan {planPosition+1} of 3</p><h1>{item.name}</h1></div></div><div className="metrics"><b>{displayPlan.cost}<span>Total cost</span></b><b>{displayPlan.arrival}<span>Arrival</span></b><b>{displayPlan.score}<span>Total score</span></b></div><Info icon={'✈'} label="Flight" value={displayPlan.flight} button onClick={()=>setChooser('flight')}/><Info icon={'▣'} label="Hotel" value={displayPlan.hotel} button onClick={()=>setChooser('hotel')}/><Info icon={'⌁'} label="Route" value={displayPlan.route}/><Info icon={'⌖'} label="Hotel distance" value={displayPlan.hotelDistance}/><Info icon={'⬡'} label="Risk" value={displayPlan.risk}/><DecisionBrief plan={displayPlan} brief={decisionBriefs[planPosition]} alternatives={alternateRouteOptions[planPosition]} selected={selectedAlternateRoutes[planPosition]} onSelect={(option)=>{setSelectedPriority('custom'); setSelectedAlternateRoutes((current)=>({ ...current, [planPosition]: current[planPosition]?.id === option.id ? undefined : option }));}}/><p className="explain"><IconGlyph icon="🤖"/>{displayPlan.explanation}</p>{planPosition===index && <button className="primary" onClick={onConfirm}>Approve Plan</button>}</article>})}</div></div><button className="arrow" aria-label="Next plan" onClick={()=>setIndex((index+1)%plans.length)}><IconGlyph icon="›"/></button>{chooser && <ChoiceModal type={chooser} selected={chooser === 'flight' ? selectedFlights[index] : selectedHotels[index]} onSelect={selectChoice} onClose={()=>setChooser(null)} />}</div>;
+  return <div className="results appear"><button className="arrow" aria-label="Previous plan" onClick={()=>setIndex((index+routeData.plans.length-1)%routeData.plans.length)}><IconGlyph icon="‹"/></button><div className="plan-shell"><div className="priority-panel"><span>Plan priority</span><div>{priorityStrategies.map((strategy)=><button type="button" key={strategy.id} className={selectedPriority===strategy.id?'active':''} onClick={()=>applyPriority(strategy)}>{strategy.label}</button>)}</div></div><div className="plan-tabs">{routeData.plans.map((item, planPosition)=><button key={item.name} className={planPosition===index?'active':''} onClick={()=>setIndex(planPosition)}>Plan {planPosition+1}</button>)}</div><div className="carousel-stage">{routeData.plans.map((item, planPosition)=>{ const displayPlan = planFor(item, planPosition); return <article className={`card plan-card ${item.accent} ${getPosition(planPosition)}`} aria-hidden={planPosition!==index} key={item.name}><div className="plan-head"><IconGlyph icon={item.icon}/><div><p>{planPosition === routeData.recommendedPlanIndex ? <span className="ai-recommended">Recommended</span> : <span className="ai-recommended evidence">Checked</span>} Plan {planPosition+1} of 3</p><h1>{item.name}</h1></div></div><div className="metrics"><b>{displayPlan.cost}<span>Total cost</span></b><b>{displayPlan.arrival}<span>Arrival</span></b><b>{displayPlan.score}<span>Total score</span></b></div><Info icon={'✈'} label="Flight" value={displayPlan.flight} button onClick={()=>setChooser('flight')}/><Info icon={'▣'} label="Hotel" value={displayPlan.hotel} button onClick={()=>setChooser('hotel')}/><Info icon={'⌁'} label="Route" value={displayPlan.route}/><Info icon={'⌖'} label="Hotel distance" value={displayPlan.hotelDistance}/><Info icon={'⬡'} label="Risk" value={displayPlan.risk}/><DecisionBrief plan={displayPlan} brief={routeData.decisionBriefs[planPosition]} alternatives={routeData.alternateRouteOptions[planPosition]} selected={selectedAlternateRoutes[planPosition]} onSelect={(option)=>{setSelectedPriority('custom'); setSelectedAlternateRoutes((current)=>({ ...current, [planPosition]: current[planPosition]?.id === option.id ? undefined : option }));}}/><p className="explain"><IconGlyph icon="🤖"/>{displayPlan.explanation}</p>{planPosition===index && <button className="primary" onClick={onConfirm}>Approve Plan</button>}</article>})}</div></div><button className="arrow" aria-label="Next plan" onClick={()=>setIndex((index+1)%routeData.plans.length)}><IconGlyph icon="›"/></button>{chooser && <ChoiceModal type={chooser} routeData={routeData} selected={chooser === 'flight' ? selectedFlights[index] : selectedHotels[index]} onSelect={selectChoice} onClose={()=>setChooser(null)} />}</div>;
 }
 function DecisionBrief({ plan, brief, alternatives, selected, onSelect }) {
   const metrics = [
@@ -429,12 +504,12 @@ function AnimatedScore({ label, value }) {
 }
 function Info({icon:Icon,label,value,button,onClick}){const Tag=button?'button':'div';return <Tag type={button?'button':undefined} className={`info ${button?'clickable':''}`} onClick={onClick}><IconGlyph icon={Icon}/><span>{label}</span><strong>{value}</strong>{button && <em>Change</em>}</Tag>}
 
-function ChoiceModal({ type, selected, onSelect, onClose }) {
+function ChoiceModal({ type, routeData, selected, onSelect, onClose }) {
   const isFlight = type === 'flight';
-  const options = isFlight ? flightOptions : hotelOptions;
-  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="choice-modal" role="dialog" aria-modal="true" aria-label={isFlight ? 'Flight options' : 'Hotel options'} onClick={(event)=>event.stopPropagation()}><div className="modal-head"><div><span>{isFlight ? 'SFO → NYC demo flights' : 'NYC demo hotels'}</span><h2>{isFlight ? 'Choose a flight option' : 'Choose a hotel option'}</h2></div><button type="button" aria-label="Close options" onClick={onClose}>×</button></div><div className="choice-list">{options.map((option)=>{ const active = selected && (isFlight ? selected.airline === option.airline : selected.name === option.name); return <button type="button" className={`choice-card ${active ? 'selected' : ''}`} key={isFlight ? option.airline : option.name} onClick={()=>onSelect(option)}><div className="choice-title"><strong>{isFlight ? option.airline : option.name}</strong><span>{isFlight ? option.price : option.rate}</span></div><p>{isFlight ? option.route : option.location}</p><div className="choice-meta">{isFlight ? <><span>{option.departure} → {option.arrival}</span><span>{option.stops}</span><span>{option.duration}</span><em>{option.tag}</em></> : <><span>{option.distance}</span><span>{option.tag}</span><em>{option.rating}</em></>}</div></button>})}</div></section></div>;
+  const options = isFlight ? routeData.flightOptions : routeData.hotelOptions;
+  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="choice-modal" role="dialog" aria-modal="true" aria-label={isFlight ? 'Flight options' : 'Hotel options'} onClick={(event)=>event.stopPropagation()}><div className="modal-head"><div><span>{isFlight ? 'Curated demo flights' : 'Curated demo hotels'}</span><h2>{isFlight ? 'Choose a flight option' : 'Choose a hotel option'}</h2></div><button type="button" aria-label="Close options" onClick={onClose}>×</button></div><div className="choice-list">{options.map((option)=>{ const active = selected && (isFlight ? selected.airline === option.airline : selected.name === option.name); return <button type="button" className={`choice-card ${active ? 'selected' : ''}`} key={isFlight ? option.airline : option.name} onClick={()=>onSelect(option)}><div className="choice-title"><strong>{isFlight ? option.airline : option.name}</strong><span>{isFlight ? option.price : option.rate}</span></div><p>{isFlight ? option.route : option.location}</p><div className="choice-meta">{isFlight ? <><span>{option.departure} → {option.arrival}</span><span>{option.stops}</span><span>{option.duration}</span><em>{option.tag}</em></> : <><span>{option.distance}</span><span>{option.tag}</span><em>{option.rating}</em></>}</div></button>})}</div></section></div>;
 }
-function ConfirmPage({ plan, onConfirm, onEdit }) { return <div className="card confirm-card appear"><h1>Approve Travel Plan</h1><p className="notice"><IconGlyph icon="⬡"/>JustMove.AI built this plan from your goal, budget, timing risk, hotel distance, and backup-route analysis. It will not book anything until you approve the plan below.</p><div className="summary"><div className="summary-hero"><IconGlyph icon={plan.icon}/><div><span>Recommended plan awaiting approval</span><strong>{plan.name}</strong><p>{plan.explanation}</p></div></div><div className="summary-grid"><Info icon={'◫'} label="Mock total" value={plan.cost}/><Info icon={'◴'} label="Arrival" value={plan.arrival}/><Info icon={'⬡'} label="Score" value={`${plan.score} / 100`}/><Info icon={'⬡'} label="Risk" value={plan.risk}/><Info icon={'⌁'} label="Route" value={plan.route}/><Info icon={'▣'} label="Stay" value={plan.hotel}/><Info icon={'◴'} label="Meeting" value="Empire State Building · 10:00 AM"/></div></div><div className="actions"><button className="primary" onClick={onConfirm}>Approve & Book Plan</button><button onClick={onEdit}>Refine Plan</button><button>Why this plan</button></div></div>; }
-function MonitorPage({ onReset }) { return <div className="card monitor-card appear"><div className="alert"><IconGlyph icon="🔔"/>Sample disruption alert</div><h1>Trip Monitor</h1><p>JustMove is watching the approved plan for flight delays, fare and rebooking price changes, hotel availability or quality issues, ground-transfer risk, and backup route opportunities.</p><div className="watch-grid"><span>Delays: active</span><span>Price changes: active</span><span>Hotel issues: active</span><span>Backup routes: active</span></div><div className="backup disruption"><h2>Recommended backup plan</h2><p>Your original SFO → EWR flight is projected 48 minutes late and would shrink the meeting buffer. JustMove recommends switching to an earlier SFO → JFK nonstop and keeping the same Midtown hotel.</p><Info icon={'✈'} label="Backup route" value="Earlier SFO → JFK nonstop · arrives 8:42 PM"/><Info icon={'◈'} label="Budget impact" value="+$96 · still under $1,800"/><Info icon={'⬡'} label="Risk reduction" value="Meeting-delay risk drops to Very Low"/></div><div className="actions"><button onClick={onReset}>Keep Current Plan</button><button className="primary" onClick={onReset}>Approve Backup</button></div></div>; }
+function ConfirmPage({ plan, routeData, onConfirm, onEdit }) { if (!plan) return null; return <div className="card confirm-card appear"><h1>Approve Travel Plan</h1><p className="notice"><IconGlyph icon="⬡"/>{routeData.confirmDetails.approvalCopy} It will not book anything until you approve the plan below.</p><div className="summary"><div className="summary-hero"><IconGlyph icon={plan.icon}/><div><span>Recommended plan awaiting approval</span><strong>{plan.name}</strong><p>{plan.explanation}</p></div></div><div className="summary-grid"><Info icon={'◫'} label="Mock total" value={plan.cost}/><Info icon={'◴'} label="Arrival" value={plan.arrival}/><Info icon={'⬡'} label="Score" value={`${plan.score} / 100`}/><Info icon={'⬡'} label="Risk" value={plan.risk}/><Info icon={'⌁'} label="Route" value={plan.route}/><Info icon={'▣'} label="Stay" value={plan.hotel}/><Info icon={'◴'} label="Meeting" value={routeData.confirmDetails.meeting}/></div></div><div className="actions"><button className="primary" onClick={onConfirm}>Approve & Book Plan</button><button onClick={onEdit}>Refine Plan</button><button>Why this plan</button></div></div>; }
+function MonitorPage({ routeData, onReset }) { return <div className="card monitor-card appear"><div className="alert"><IconGlyph icon="🔔"/>{routeData?.monitoringExample.alert ?? 'Sample disruption alert'}</div><h1>Trip Monitor</h1><p>JustMove is watching the approved plan for flight delays, fare and rebooking price changes, hotel availability or quality issues, ground-transfer risk, and backup route opportunities.</p><div className="watch-grid"><span>Delays: active</span><span>Price changes: active</span><span>Hotel issues: active</span><span>Backup routes: active</span></div><div className="backup disruption"><h2>Recommended backup plan</h2><p>{routeData?.monitoringExample.backup ?? 'Your original flight is projected late and would shrink the meeting buffer. JustMove recommends switching to an earlier nonstop and keeping the same hotel.'}</p><Info icon={'✈'} label="Backup route" value="Earlier SFO → JFK nonstop · arrives 8:42 PM"/><Info icon={'◈'} label="Budget impact" value="+$96 · still under $1,800"/><Info icon={'⬡'} label="Risk reduction" value="Meeting-delay risk drops to Very Low"/></div><div className="actions"><button onClick={onReset}>Keep Current Plan</button><button className="primary" onClick={onReset}>Approve Backup</button></div></div>; }
 
 createRoot(document.getElementById('root')).render(<App />);
