@@ -76,10 +76,12 @@ const advancedPreferenceOptions = [
 
 const steps = ['Reading trip details', 'Comparing flights, hotels, and timing risk', 'Checking costs against your caps', 'Finding delay backups and commute buffers', 'Building 3 smart plans'];
 
+const RECOMMENDED_PLAN_INDEX = 1;
+
 const plans = [
-  { name: 'Lowest Cost Plan', icon: '◈', cost: '$1,342', risk: 'Medium', confidence: '88%', accent: 'teal', flight: 'SFO → JFK · 6:10 AM · 1 short layover', hotel: 'Pod Times Square · 1.1 mi from meeting', ground: 'AirTrain + rideshare buffer', explanation: 'Optimizes total spend while preserving a 90-minute arrival buffer before the client meeting.' },
-  { name: 'Best Balance Plan', icon: '✦', cost: '$1,617', risk: 'Low', confidence: '94%', accent: 'purple', flight: 'SFO → EWR · 7:25 AM · nonstop', hotel: 'Hyatt Place Midtown · 0.5 mi from meeting', ground: 'Pre-scheduled rideshare', explanation: 'Balances nonstop reliability, hotel proximity, and a comfortable budget margin under $1,800.' },
-  { name: 'Most Reliable Plan', icon: '⬡', cost: '$1,764', risk: 'Very Low', confidence: '97%', accent: 'cyan', flight: 'SFO → JFK · 6:00 AM · nonstop', hotel: 'Moxy NYC Times Square · 0.4 mi from meeting', ground: 'Black car pickup + subway backup', explanation: 'Prioritizes on-time arrival with the strongest flight history and the shortest morning transfer.' },
+  { name: 'Lowest Cost Plan', icon: '◈', cost: '$1,342', risk: 'Medium', confidence: '88%', score: 86, arrival: '4:48 PM', route: 'SFO → JFK via MSP', hotelDistance: '1.1 mi from meeting', accent: 'teal', flight: 'SFO → JFK · 6:10 AM · 1 short layover', hotel: 'Pod Times Square · 1.1 mi from meeting', ground: 'AirTrain + rideshare buffer', explanation: 'Optimizes total spend while preserving a 90-minute arrival buffer before the client meeting.' },
+  { name: 'Best Balance Plan', icon: '✦', cost: '$1,617', risk: 'Low', confidence: '94%', score: 94, arrival: '3:58 PM', route: 'SFO → EWR nonstop', hotelDistance: '0.5 mi from meeting', accent: 'purple', flight: 'SFO → EWR · 7:25 AM · nonstop', hotel: 'Hyatt Place Midtown · 0.5 mi from meeting', ground: 'Pre-scheduled rideshare', explanation: 'Balances nonstop reliability, hotel proximity, and a comfortable budget margin under $1,800.' },
+  { name: 'Most Reliable Plan', icon: '⬡', cost: '$1,764', risk: 'Very Low', confidence: '97%', score: 97, arrival: '2:29 PM', route: 'SFO → JFK nonstop', hotelDistance: '0.4 mi from meeting', accent: 'cyan', flight: 'SFO → JFK · 6:00 AM · nonstop', hotel: 'Moxy NYC Times Square · 0.4 mi from meeting', ground: 'Black car pickup + subway backup', explanation: 'Prioritizes on-time arrival with the strongest flight history and the shortest morning transfer.' },
 ];
 
 const flightOptions = [
@@ -88,6 +90,28 @@ const flightOptions = [
   { airline: 'JetBlue', route: 'SFO → JFK', departure: '8:10 AM', arrival: '4:44 PM', stops: 'Nonstop', duration: '5h 34m', price: '$372', tag: 'Lower-cost' },
   { airline: 'American', route: 'SFO → JFK', departure: '6:00 AM', arrival: '2:29 PM', stops: 'Nonstop', duration: '5h 29m', price: '$512', tag: 'Premium friendly' },
   { airline: 'Alaska', route: 'SFO → JFK', departure: '8:45 AM', arrival: '5:15 PM', stops: 'Nonstop', duration: '5h 30m', price: '$398', tag: 'Flexible value' },
+];
+
+
+const alternateRouteOptions = [
+  [
+    { id: 'lowest-fastest', label: 'Fastest direct route', route: 'OAK → EWR nonstop', arrival: '3:20 PM', flightPrice: 438, hotelDistance: '1.0 mi from meeting', scoreDelta: 4, confidenceDelta: 3, riskAdjustment: -0.35, explanation: 'Switches to an Oakland nonstop that arrives earlier and removes layover risk while keeping the lower-cost hotel profile.' },
+    { id: 'lowest-nearby', label: 'Cheaper nearby airport', route: 'SJC → JFK nonstop', arrival: '4:10 PM', flightPrice: 318, hotelDistance: '1.2 mi from meeting', scoreDelta: 1, confidenceDelta: 1, riskAdjustment: 0.05, explanation: 'Uses San Jose for the fare savings and keeps enough buffer for the meeting, with a slightly longer airport transfer.' },
+    { id: 'lowest-backup', label: 'Backup through Chicago', route: 'SFO → ORD → LGA', arrival: '5:05 PM', flightPrice: 346, hotelDistance: '0.9 mi from meeting', scoreDelta: -2, confidenceDelta: -2, riskAdjustment: 0.45, explanation: 'Adds a Chicago connection as a backup route with better rebooking coverage but a later arrival window.' },
+    { id: 'lowest-flex', label: 'Flexible date option', route: 'SFO → JFK nonstop · Wed depart', arrival: '3:45 PM', flightPrice: 334, hotelDistance: '1.1 mi from meeting', scoreDelta: 3, confidenceDelta: 2, riskAdjustment: -0.1, explanation: 'Moves departure by one day to capture a cheaper nonstop and preserve the original hotel distance.' },
+  ],
+  [
+    { id: 'balance-fastest', label: 'Fastest direct route', route: 'SFO → JFK nonstop', arrival: '3:32 PM', flightPrice: 446, hotelDistance: '0.5 mi from meeting', scoreDelta: 2, confidenceDelta: 1, riskAdjustment: -0.15, explanation: 'Chooses the quickest JFK nonstop while preserving the balanced hotel and comfortable meeting buffer.' },
+    { id: 'balance-nearby', label: 'Cheaper nearby airport', route: 'OAK → EWR nonstop', arrival: '4:05 PM', flightPrice: 389, hotelDistance: '0.6 mi from meeting', scoreDelta: 1, confidenceDelta: 0, riskAdjustment: 0.05, explanation: 'Trades a nearby Bay Area departure for lower airfare with almost no change to hotel proximity.' },
+    { id: 'balance-backup', label: 'Backup through Denver', route: 'SFO → DEN → LGA', arrival: '5:28 PM', flightPrice: 402, hotelDistance: '0.4 mi from meeting', scoreDelta: -3, confidenceDelta: -3, riskAdjustment: 0.5, explanation: 'Keeps a protected backup through Denver and offsets the later arrival with a closer hotel-to-meeting distance.' },
+    { id: 'balance-flex', label: 'Flexible date option', route: 'SFO → EWR nonstop · Mon depart', arrival: '3:50 PM', flightPrice: 396, hotelDistance: '0.5 mi from meeting', scoreDelta: 3, confidenceDelta: 2, riskAdjustment: -0.2, explanation: 'Uses flexible dates to lower the fare while keeping the recommended nonstop route and hotel distance.' },
+  ],
+  [
+    { id: 'reliable-fastest', label: 'Fastest direct route', route: 'SFO → JFK nonstop', arrival: '2:18 PM', flightPrice: 548, hotelDistance: '0.4 mi from meeting', scoreDelta: 1, confidenceDelta: 1, riskAdjustment: -0.2, explanation: 'Keeps the reliability-first nonstop and improves the arrival buffer with the earliest direct option.' },
+    { id: 'reliable-nearby', label: 'Cheaper nearby airport', route: 'OAK → EWR nonstop', arrival: '3:42 PM', flightPrice: 468, hotelDistance: '0.5 mi from meeting', scoreDelta: -1, confidenceDelta: -1, riskAdjustment: 0.1, explanation: 'Reduces airfare through Oakland while retaining a nonstop itinerary and a close Midtown hotel.' },
+    { id: 'reliable-backup', label: 'Backup through Atlanta', route: 'SFO → ATL → LGA', arrival: '5:12 PM', flightPrice: 492, hotelDistance: '0.3 mi from meeting', scoreDelta: -4, confidenceDelta: -4, riskAdjustment: 0.55, explanation: 'Adds a high-frequency Atlanta backup path; the closer hotel helps offset the later arrival risk.' },
+    { id: 'reliable-flex', label: 'Flexible date option', route: 'SFO → JFK nonstop · Wed depart', arrival: '2:36 PM', flightPrice: 486, hotelDistance: '0.4 mi from meeting', scoreDelta: 2, confidenceDelta: 1, riskAdjustment: -0.15, explanation: 'Shifts dates to reduce premium fare while preserving the strongest nonstop and short hotel transfer.' },
+  ],
 ];
 
 const hotelOptions = [
@@ -137,27 +161,34 @@ const hotelRiskAdjustment = (hotel) => {
   return -0.1;
 };
 
-const demoPlanFor = (item, planPosition, selectedFlights, selectedHotels) => {
+const demoPlanFor = (item, planPosition, selectedFlights, selectedHotels, selectedAlternateRoutes = {}) => {
   const selectedFlight = selectedFlights[planPosition];
   const selectedHotel = selectedHotels[planPosition];
-  const changed = Boolean(selectedFlight || selectedHotel);
+  const selectedAlternateRoute = selectedAlternateRoutes[planPosition];
+  const changed = Boolean(selectedFlight || selectedHotel || selectedAlternateRoute);
   if (!changed) return item;
 
   const base = planDemoPrices[planPosition];
-  const flightPrice = selectedFlight ? currencyValue(selectedFlight.price) : base.flight;
+  const flightPrice = selectedAlternateRoute?.flightPrice ?? (selectedFlight ? currencyValue(selectedFlight.price) : base.flight);
   const hotelRate = selectedHotel ? currencyValue(selectedHotel.rate) : base.hotel;
   const total = flightPrice + hotelRate + GROUND_TRANSPORT_ESTIMATE;
   const baseRisk = riskScores[item.risk] ?? 3;
-  const riskScore = clamp(baseRisk + flightRiskAdjustment(selectedFlight) + hotelRiskAdjustment(selectedHotel) + (total < 900 ? 0.25 : 0) - (total > 980 ? 0.15 : 0), 1, 4);
-  const confidence = clamp(Number(item.confidence.replace('%', '')) - ((riskScore - baseRisk) * 5) + (selectedFlight?.tag.toLowerCase().includes('lower-cost') ? -1 : 0) + (selectedHotel?.tag.toLowerCase().includes('refundable') ? 2 : 0), 82, 99);
+  const riskScore = clamp(baseRisk + flightRiskAdjustment(selectedFlight) + hotelRiskAdjustment(selectedHotel) + (selectedAlternateRoute?.riskAdjustment ?? 0) + (total < 900 ? 0.25 : 0) - (total > 980 ? 0.15 : 0), 1, 4);
+  const confidence = clamp(Number(item.confidence.replace('%', '')) - ((riskScore - baseRisk) * 5) + (selectedFlight?.tag.toLowerCase().includes('lower-cost') ? -1 : 0) + (selectedHotel?.tag.toLowerCase().includes('refundable') ? 2 : 0) + (selectedAlternateRoute?.confidenceDelta ?? 0), 82, 99);
+  const score = clamp(item.score + (selectedAlternateRoute?.scoreDelta ?? 0) + (confidence - Number(item.confidence.replace('%', ''))) * 0.25, 70, 99);
 
   return {
     ...item,
     cost: formatCurrency(total),
     risk: riskLabelFromScore(riskScore),
     confidence: `${Math.round(confidence)}%`,
-    flight: selectedFlight ? formatFlight(selectedFlight) : item.flight,
-    hotel: selectedHotel ? formatHotel(selectedHotel) : item.hotel,
+    flight: selectedAlternateRoute ? `${selectedAlternateRoute.route} · arrives ${selectedAlternateRoute.arrival}` : selectedFlight ? formatFlight(selectedFlight) : item.flight,
+    hotel: selectedHotel ? formatHotel(selectedHotel) : selectedAlternateRoute ? `${item.hotel.split(' · ')[0]} · ${selectedAlternateRoute.hotelDistance}` : item.hotel,
+    route: selectedAlternateRoute?.route ?? item.route,
+    arrival: selectedAlternateRoute?.arrival ?? selectedFlight?.arrival ?? item.arrival,
+    hotelDistance: selectedAlternateRoute?.hotelDistance ?? selectedHotel?.distance?.replace(' to Empire State Building', ' from meeting') ?? item.hotelDistance,
+    score: Math.round(score),
+    explanation: selectedAlternateRoute?.explanation ?? item.explanation,
   };
 };
 
@@ -165,11 +196,19 @@ const demoPlanFor = (item, planPosition, selectedFlights, selectedHotels) => {
 function App() {
   const [page, setPage] = useState('book');
   const [mode, setMode] = useState('guided');
-  const [planIndex, setPlanIndex] = useState(1);
+  const [planIndex, setPlanIndex] = useState(RECOMMENDED_PLAN_INDEX);
   const [mouse, setMouse] = useState({ x: 50, y: 35 });
   const [selectedFlights, setSelectedFlights] = useState({});
   const [selectedHotels, setSelectedHotels] = useState({});
-  const plan = demoPlanFor(plans[planIndex], planIndex, selectedFlights, selectedHotels);
+  const [selectedAlternateRoutes, setSelectedAlternateRoutes] = useState({});
+  const plan = demoPlanFor(plans[planIndex], planIndex, selectedFlights, selectedHotels, selectedAlternateRoutes);
+  const resetGeneratedPlanState = () => {
+    setPlanIndex(RECOMMENDED_PLAN_INDEX);
+    setSelectedFlights({});
+    setSelectedHotels({});
+    setSelectedAlternateRoutes({});
+    setPage('processing');
+  };
 
   useEffect(() => {
     const onMove = (e) => setMouse({ x: (e.clientX / window.innerWidth) * 100, y: (e.clientY / window.innerHeight) * 100 });
@@ -190,9 +229,9 @@ function App() {
     <Header />
     <Progress current={currentStep} />
     <section className="stage">
-      {page === 'book' && <BookingPage mode={mode} setMode={setMode} onNext={() => setPage('processing')} />}
+      {page === 'book' && <BookingPage mode={mode} setMode={setMode} onNext={resetGeneratedPlanState} />}
       {page === 'processing' && <ProcessingPage />}
-      {page === 'results' && <ResultsPage plan={plan} index={planIndex} setIndex={setPlanIndex} selectedFlights={selectedFlights} setSelectedFlights={setSelectedFlights} selectedHotels={selectedHotels} setSelectedHotels={setSelectedHotels} onConfirm={() => setPage('confirm')} />}
+      {page === 'results' && <ResultsPage plan={plan} index={planIndex} setIndex={setPlanIndex} selectedFlights={selectedFlights} setSelectedFlights={setSelectedFlights} selectedHotels={selectedHotels} setSelectedHotels={setSelectedHotels} selectedAlternateRoutes={selectedAlternateRoutes} setSelectedAlternateRoutes={setSelectedAlternateRoutes} onConfirm={() => setPage('confirm')} />}
       {page === 'confirm' && <ConfirmPage plan={plan} onConfirm={() => setPage('monitor')} onEdit={() => setPage('results')} />}
       {page === 'monitor' && <MonitorPage onReset={() => setPage('book')} />}
     </section>
@@ -238,22 +277,23 @@ function CalendarPanel({ value, onSelect }) {
 
 function ProcessingPage() { const [active,setActive]=useState(0); useEffect(()=>{const id=setInterval(()=>setActive(v=>Math.min(v+1,4)),760); return()=>clearInterval(id)},[]); return <div className="card process-card appear"><div className="ai-core"><IconGlyph icon="✦"/><span/></div><h1>JustMove AI is planning your trip</h1><p className="processing-copy">The demo AI is comparing flight schedules, hotel proximity, meeting-time risk, total cost, and backup options before recommending three plans.</p><div className="steps">{steps.map((s,i)=><div className={`step ${i<=active?'done':''}`} key={s}><IconGlyph icon="✓"/>{s}</div>)}</div></div>; }
 
-function ResultsPage({ index, setIndex, selectedFlights, setSelectedFlights, selectedHotels, setSelectedHotels, onConfirm }) {
+function ResultsPage({ index, setIndex, selectedFlights, setSelectedFlights, selectedHotels, setSelectedHotels, selectedAlternateRoutes, setSelectedAlternateRoutes, onConfirm }) {
   const [chooser, setChooser] = useState(null);
   const getPosition = (planPosition) => {
     if (planPosition === index) return 'active';
     if (planPosition === (index + 1) % plans.length) return 'next';
     return 'prev';
   };
-  const planFor = (item, planPosition) => demoPlanFor(item, planPosition, selectedFlights, selectedHotels);
+  const planFor = (item, planPosition) => demoPlanFor(item, planPosition, selectedFlights, selectedHotels, selectedAlternateRoutes);
   const selectChoice = (choice) => {
     if (chooser === 'flight') setSelectedFlights((current) => ({ ...current, [index]: choice }));
     if (chooser === 'hotel') setSelectedHotels((current) => ({ ...current, [index]: choice }));
     setChooser(null);
   };
 
-  return <div className="results appear"><button className="arrow" aria-label="Previous plan" onClick={()=>setIndex((index+plans.length-1)%plans.length)}><IconGlyph icon="‹"/></button><div className="plan-shell"><div className="plan-tabs">{plans.map((item, planPosition)=><button key={item.name} className={planPosition===index?'active':''} onClick={()=>setIndex(planPosition)}>Plan {planPosition+1}</button>)}</div><div className="carousel-stage">{plans.map((item, planPosition)=>{ const displayPlan = planFor(item, planPosition); return <article className={`card plan-card ${item.accent} ${getPosition(planPosition)}`} aria-hidden={planPosition!==index} key={item.name}><div className="plan-head"><IconGlyph icon={item.icon}/><div><p>Plan {planPosition+1} of 3</p><h1>{item.name}</h1></div></div><div className="metrics"><b>{displayPlan.cost}<span>Total cost</span></b><b>{displayPlan.risk}<span>Risk level</span></b><b>{displayPlan.confidence}<span>Confidence</span></b></div><Info icon={'✈'} label="Flight" value={displayPlan.flight} button onClick={()=>setChooser('flight')}/><Info icon={'▣'} label="Hotel" value={displayPlan.hotel} button onClick={()=>setChooser('hotel')}/><Info icon={'⌖'} label="Ground transport" value={item.ground}/><p className="explain"><IconGlyph icon="🤖"/>{item.explanation}</p>{planPosition===index && <button className="primary" onClick={onConfirm}>Confirm & Book</button>}</article>})}</div></div><button className="arrow" aria-label="Next plan" onClick={()=>setIndex((index+1)%plans.length)}><IconGlyph icon="›"/></button>{chooser && <ChoiceModal type={chooser} selected={chooser === 'flight' ? selectedFlights[index] : selectedHotels[index]} onSelect={selectChoice} onClose={()=>setChooser(null)} />}</div>;
+  return <div className="results appear"><button className="arrow" aria-label="Previous plan" onClick={()=>setIndex((index+plans.length-1)%plans.length)}><IconGlyph icon="‹"/></button><div className="plan-shell"><div className="plan-tabs">{plans.map((item, planPosition)=><button key={item.name} className={planPosition===index?'active':''} onClick={()=>setIndex(planPosition)}>Plan {planPosition+1}</button>)}</div><div className="carousel-stage">{plans.map((item, planPosition)=>{ const displayPlan = planFor(item, planPosition); return <article className={`card plan-card ${item.accent} ${getPosition(planPosition)}`} aria-hidden={planPosition!==index} key={item.name}><div className="plan-head"><IconGlyph icon={item.icon}/><div><p>Plan {planPosition+1} of 3</p><h1>{item.name}</h1></div></div><div className="metrics"><b>{displayPlan.cost}<span>Total cost</span></b><b>{displayPlan.arrival}<span>Arrival</span></b><b>{displayPlan.score}<span>Total score</span></b></div><Info icon={'✈'} label="Flight" value={displayPlan.flight} button onClick={()=>setChooser('flight')}/><Info icon={'▣'} label="Hotel" value={displayPlan.hotel} button onClick={()=>setChooser('hotel')}/><Info icon={'⌁'} label="Route" value={displayPlan.route}/><Info icon={'⌖'} label="Hotel distance" value={displayPlan.hotelDistance}/><AlternateRoutePicker options={alternateRouteOptions[planPosition]} selected={selectedAlternateRoutes[planPosition]} onSelect={(option)=>setSelectedAlternateRoutes((current)=>({ ...current, [planPosition]: current[planPosition]?.id === option.id ? undefined : option }))}/><p className="explain"><IconGlyph icon="🤖"/>{displayPlan.explanation}</p>{planPosition===index && <button className="primary" onClick={onConfirm}>Confirm & Book</button>}</article>})}</div></div><button className="arrow" aria-label="Next plan" onClick={()=>setIndex((index+1)%plans.length)}><IconGlyph icon="›"/></button>{chooser && <ChoiceModal type={chooser} selected={chooser === 'flight' ? selectedFlights[index] : selectedHotels[index]} onSelect={selectChoice} onClose={()=>setChooser(null)} />}</div>;
 }
+function AlternateRoutePicker({ options, selected, onSelect }) { return <section className="alternate-routes"><div><span>Alternate Route Options</span><strong>{selected ? selected.label : 'Recommended route'}</strong></div><div className="alternate-grid">{options.map((option)=><button type="button" key={option.id} className={selected?.id === option.id ? 'selected' : ''} onClick={()=>onSelect(option)}><strong>{option.label}</strong><em>{option.route} · arrives {option.arrival}</em><span>{formatCurrency(option.flightPrice)} flight · {option.hotelDistance}</span></button>)}</div></section>; }
 function Info({icon:Icon,label,value,button,onClick}){const Tag=button?'button':'div';return <Tag type={button?'button':undefined} className={`info ${button?'clickable':''}`} onClick={onClick}><IconGlyph icon={Icon}/><span>{label}</span><strong>{value}</strong>{button && <em>Change</em>}</Tag>}
 
 function ChoiceModal({ type, selected, onSelect, onClose }) {
@@ -261,7 +301,7 @@ function ChoiceModal({ type, selected, onSelect, onClose }) {
   const options = isFlight ? flightOptions : hotelOptions;
   return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="choice-modal" role="dialog" aria-modal="true" aria-label={isFlight ? 'Flight options' : 'Hotel options'} onClick={(event)=>event.stopPropagation()}><div className="modal-head"><div><span>{isFlight ? 'SFO → NYC demo flights' : 'NYC demo hotels'}</span><h2>{isFlight ? 'Choose a flight option' : 'Choose a hotel option'}</h2></div><button type="button" aria-label="Close options" onClick={onClose}>×</button></div><div className="choice-list">{options.map((option)=>{ const active = selected && (isFlight ? selected.airline === option.airline : selected.name === option.name); return <button type="button" className={`choice-card ${active ? 'selected' : ''}`} key={isFlight ? option.airline : option.name} onClick={()=>onSelect(option)}><div className="choice-title"><strong>{isFlight ? option.airline : option.name}</strong><span>{isFlight ? option.price : option.rate}</span></div><p>{isFlight ? option.route : option.location}</p><div className="choice-meta">{isFlight ? <><span>{option.departure} → {option.arrival}</span><span>{option.stops}</span><span>{option.duration}</span><em>{option.tag}</em></> : <><span>{option.distance}</span><span>{option.tag}</span><em>{option.rating}</em></>}</div></button>})}</div></section></div>;
 }
-function ConfirmPage({ plan, onConfirm, onEdit }) { return <div className="card confirm-card appear"><h1>Confirm & Book</h1><p className="notice"><IconGlyph icon="⬡"/>JustMove.AI never books without your approval. Review this mock trip summary, then explicitly confirm.</p><div className="summary"><div className="summary-hero"><IconGlyph icon={plan.icon}/><div><span>Selected plan</span><strong>{plan.name}</strong><p>{plan.explanation}</p></div></div><div className="summary-grid"><Info icon={'◫'} label="Mock total" value={plan.cost}/><Info icon={'▣'} label="Stay" value={plan.hotel}/><Info icon={'◴'} label="Meeting" value="Empire State Building · 10:00 AM"/></div></div><div className="actions"><button className="primary" onClick={onConfirm}>Confirm Booking</button><button onClick={onEdit}>Edit Plan</button><button>Ask AI Why</button></div></div>; }
+function ConfirmPage({ plan, onConfirm, onEdit }) { return <div className="card confirm-card appear"><h1>Confirm & Book</h1><p className="notice"><IconGlyph icon="⬡"/>JustMove.AI never books without your approval. Review this mock trip summary, then explicitly confirm.</p><div className="summary"><div className="summary-hero"><IconGlyph icon={plan.icon}/><div><span>Selected plan</span><strong>{plan.name}</strong><p>{plan.explanation}</p></div></div><div className="summary-grid"><Info icon={'◫'} label="Mock total" value={plan.cost}/><Info icon={'◴'} label="Arrival" value={plan.arrival}/><Info icon={'⬡'} label="Score" value={`${plan.score} / 100`}/><Info icon={'⌁'} label="Route" value={plan.route}/><Info icon={'▣'} label="Stay" value={plan.hotel}/><Info icon={'◴'} label="Meeting" value="Empire State Building · 10:00 AM"/></div></div><div className="actions"><button className="primary" onClick={onConfirm}>Confirm Booking</button><button onClick={onEdit}>Edit Plan</button><button>Ask AI Why</button></div></div>; }
 function MonitorPage({ onReset }) { return <div className="card monitor-card appear"><div className="alert"><IconGlyph icon="🔔"/>Flight delay detected</div><h1>AI Travel Monitoring</h1><p>Your SFO → NYC flight is now estimated 48 minutes late. JustMove found a backup nonstop that protects your arrival buffer and keeps the trip under budget.</p><div className="backup"><Info icon={'✈'} label="Backup option" value="Earlier SFO → JFK nonstop · arrives 8:42 PM"/><Info icon={'◈'} label="Budget impact" value="+$96 · still under $1,800"/><Info icon={'⬡'} label="Reliability" value="Reduces meeting delay risk to Very Low"/></div><div className="actions"><button onClick={onReset}>Keep Current Plan</button><button className="primary" onClick={onReset}>Approve Backup</button></div></div>; }
 
 createRoot(document.getElementById('root')).render(<App />);
