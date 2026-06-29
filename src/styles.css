@@ -222,3 +222,17 @@ to{opacity:1;transform:none}
 .info.clickable strong{min-width:0;overflow-wrap:anywhere;line-height:1.35}
 .info.clickable em{align-self:center;white-space:nowrap;border-radius:999px;background:rgba(224,242,254,.9);padding:8px 10px}
 @media (max-width:800px){.results{grid-template-columns:44px minmax(0,1fr) 44px;width:100%;padding:0 4px}.carousel-stage{width:100%;height:720px;padding:0 10px;mask-image:none}.carousel-stage .plan-card{width:calc(100% - 20px)}.carousel-stage .plan-card.prev{transform:translateX(-48vw) translateY(28px) scale(.82)}.carousel-stage .plan-card.next{transform:translateX(48vw) translateY(28px) scale(.82)}.results .arrow{position:relative;top:auto;left:auto!important;right:auto!important;margin:112px 0 0;transform:none;width:44px;height:44px}.results .arrow:hover{transform:translateY(-2px)}.info.clickable{grid-template-columns:24px minmax(0,1fr) auto}.info.clickable span{grid-column:2}.info.clickable strong{grid-column:2 / 4}.info.clickable em{grid-column:3;grid-row:1 / 3}}
+
+/* Alternate route options keep the carousel styling while making route tradeoffs clickable. */
+.alternate-routes{margin:14px 0;border-top:1px solid rgba(125,211,252,.22);padding-top:14px;color:#17324d}
+.alternate-routes>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.alternate-routes>div:first-child span{color:#0e7490;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.09em}
+.alternate-routes>div:first-child strong{color:#102033;font-size:13px;text-align:right}
+.alternate-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.alternate-grid button{border:1px solid rgba(14,165,233,.18);border-radius:16px;background:rgba(255,255,255,.58);padding:11px;text-align:left;color:#17324d;cursor:pointer;transition:.22s ease;min-width:0}
+.alternate-grid button:hover,.alternate-grid button.selected{transform:translateY(-1px);border-color:rgba(14,165,233,.48);background:linear-gradient(135deg,#e3fbff,#f2ecff);box-shadow:0 12px 26px rgba(14,165,233,.13)}
+.alternate-grid button.selected{outline:3px solid rgba(14,165,233,.16)}
+.alternate-grid strong,.alternate-grid em,.alternate-grid span{display:block;line-height:1.28}
+.alternate-grid strong{font-size:13px;color:#102033}.alternate-grid em{margin-top:5px;font-style:normal;font-size:12px;color:#456076;font-weight:850}.alternate-grid span{margin-top:5px;font-size:11px;color:#0e7490;font-weight:900}
+.carousel-stage{height:760px}.carousel-stage .plan-card{max-height:735px;overflow:auto}.carousel-stage .plan-card::-webkit-scrollbar{width:0}
+@media (max-width:800px){.alternate-routes>div:first-child{align-items:flex-start;flex-direction:column}.alternate-grid{grid-template-columns:1fr}.carousel-stage{height:880px}.carousel-stage .plan-card{max-height:855px}}
